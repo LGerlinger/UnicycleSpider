@@ -1,0 +1,10 @@
+#Pour voire les topics :
+rqt
+
+#Recupération du scan de la zone et calcul du SLAM
+rosrun gmapping slam_gmapping
+
+#Lancement du visualisateur de la map
+rviz
+
+
