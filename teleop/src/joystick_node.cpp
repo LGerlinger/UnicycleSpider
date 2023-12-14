@@ -26,37 +26,57 @@
  */
 
 // %Tag(FULLTEXT)%
-#include "ros/ros.h"
-#include "sensor_msgs/Joy.h"
+#include <ros/ros.h>
+#include <geometry_msgs/Twist.h>
+#include <sensor_msgs/Joy.h>
 
-int main(int argc, char **argv)
-{
-
-  ros::init(argc, argv, "joystick_node");
-
-  ros::NodeHandle n;
-
-  //ros::Subscriber sub = n.subscribe("chatter", 1000, chatterCallback);
-  ros::Publisher joystick_data_pub = n.advertise<sensor_msgs::Joy>("joystick_data", 1000);
-  ros::Rate loop_rate(10);
-  int count = 0;
-  while (ros::ok())
-  {
-    sensor_msgs::Joy msg;
+class Joystick_node{
+  public :
+    Joystick_node();
+  private :
+    void joyCallback(const sensor_msgs::Joy::ConstPtr& joy);
+    ros::NodeHandle n;
+    ros::Publisher cmd_vel_pub;
+    ros::Subscriber joy_sub_;
 
 
-    //
-    // ROS_INFO("%s", msg.data.c_str());
+    int linear_, angular_;
+    double l_scale_, a_scale_;
 
-    joystick_data_pub.publish(msg);
-    ros::spinOnce();
+};
 
-    loop_rate.sleep();
-    ++count;
+  Joystick_node::Joystick_node(): linear_(1), angular_(0), l_scale_(1.0), a_scale_(0.6){
+    ROS_INFO("Creation ROS joystick_node");
+
+    n.param("axis_linear", linear_, linear_);
+    n.param("axis_angular", angular_, angular_);
+    n.param("scale_angular", a_scale_, a_scale_);
+    n.param("scale_linear", l_scale_, l_scale_);
+    
+    cmd_vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+    joy_sub_ = n.subscribe<sensor_msgs::Joy>("joy", 10, &Joystick_node::joyCallback, this);
   }
 
-  // ros::spin(); // ??? je ne sais pas ce que ca fait
+  void Joystick_node::joyCallback(const sensor_msgs::Joy::ConstPtr& joy)
+  {
+    geometry_msgs::Twist twist;
+    twist.linear.x = l_scale_ * joy->axes[linear_];
 
-  return 0;
-}
-// %EndTag(FULLTEXT)%
+    // ROS_INFO("ON LIS 9A : %f", joy->axes[angular_]);
+    twist.angular.z = a_scale_ * joy->axes[angular_];
+    cmd_vel_pub.publish(twist);
+  }
+
+
+  int main(int argc, char **argv)
+  {
+    ros::init(argc, argv, "joystick_node");
+    Joystick_node joystick_node;
+
+
+    
+    ros::spin();  
+
+    return 0;
+  }
+  // %EndTag(FULLTEXT)%

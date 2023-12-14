@@ -1,0 +1,19 @@
+#Lancement de la simulation
+roslaunch minilab_simulation minilab_simulation.launch
+
+#Lancement du node pour le joystick
+rosrun joy joy_node 
+
+#Make 
+catkin_make
+
+#Lancement de la node voulu
+rosrun teleop joystick_node
+
+
+
+
+
+#Lancement SC
+sudo code --verbose --user-data-dir --no-sandbox
+
