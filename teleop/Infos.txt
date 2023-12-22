@@ -10,6 +10,14 @@ catkin_make
 #Lancement de la node voulu
 rosrun teleop joystick_node
 
+#Lancement de la node de ROS récupérant les données du joystick
+rosrun joy joy_node
+
+#Lancement de rviz
+rviz
+
+#Visualiser l'architecture
+rqt_graph
 
 
 

@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+
+<launch>
+	<include file="$(find minilab_simulation)/launch/minilab_simulation.launch"/>
+
+	<!-- Node 1: joystick -->
+	<node name="joy_node" pkg="joy" type="joy_node" output="screen"/>
+
+	<!-- Node 2: teleop -->
+	<node name="teleop_node" pkg="teleop" type="joystick_node" output="screen"/>
+
+	<!-- Node 3: gmapping -->
+	<node name="slam_node" pkg="gmapping" type="slam_gmapping" output="screen">
+		<remap from="/map" to="/gmap"/>
+		<param name="xmin" value="-20.0"/>
+		<param name="xmax" value="5.0"/>
+		<param name="ymin" value="-10.0"/>
+		<param name="ymax" value="5.0"/>
+		<!--- dela (float, default: 0.05)
+		    Resolution of the map (in metres per occupancy grid block)
+		--->
+	</node>
+
+	<!-- Node 4: map -->
+	<node name="map_server" pkg="map_server" type="map_server" output="screen">
+		<args>$(find minilab_simulation)/config/map.yaml</args>
+	</node>
+
+	<!-- Node 5: rviz -->
+	<node name="rviz" pkg="rviz" type="rviz" output="screen"/>
+</launch>

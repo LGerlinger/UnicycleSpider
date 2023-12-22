@@ -8,3 +8,7 @@ rosrun gmapping slam_gmapping
 rviz
 
 
+#Enregistrer la carte générée par gmapping et ses méta-données :
+rosrun map_server map_saver map:=gmap
+#où gmap est le nom du topic créé par gmapping. Nom décidé dans le launchfile
+#génère un fichier map.pgm et map.yaml, enregistrés là où est la console
