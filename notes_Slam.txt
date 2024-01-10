@@ -1,3 +1,7 @@
+#Pour lancer le bash
+./start_docker.bash # if you haven't launched a Docker terminal already
+terminator # run this once you're in the Docker container
+
 #Pour voire les topics :
 rqt
 

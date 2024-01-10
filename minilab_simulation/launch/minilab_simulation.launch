@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+	<arg name="map" default="other" />
+	<include file="$(find minilab_simulation)/launch/minilab_gazebo.launch" >
+		<arg name="map_name" value="$(arg map)" />
+	</include>
+	<include file="$(find minilab_simulation)/launch/minilab_state_publisher.launch" />
+</launch>

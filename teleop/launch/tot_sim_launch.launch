@@ -16,16 +16,13 @@
 		<param name="xmax" value="5.0"/>
 		<param name="ymin" value="-10.0"/>
 		<param name="ymax" value="5.0"/>
-		<!--- dela (float, default: 0.05)
-		    Resolution of the map (in metres per occupancy grid block)
-		--->
+		<!-- dela (float, default: 0.05)
+		    Resolution of the map (in metres per occupancy grid block) -->
 	</node>
 
 	<!-- Node 4: map -->
-	<node name="map_server" pkg="map_server" type="map_server" output="screen">
-		<args>$(find minilab_simulation)/config/map.yaml</args>
-	</node>
+	<node name="map_server" pkg="map_server" type="map_server" args = "$(find teleop)/map/map.yaml" output="screen"/>
 
 	<!-- Node 5: rviz -->
-	<node name="rviz" pkg="rviz" type="rviz" output="screen"/>
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find teleop)/config/config.rviz" output="screen"/>
 </launch>

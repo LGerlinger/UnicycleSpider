@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<launch>
+	<include file="$(find minilab_simulation)/launch/minilab_simulation.launch"/>
+
+	<!-- Node 3: gmapping -->
+	<node name="slam_node" pkg="gmapping" type="slam_gmapping" output="screen">
+		<remap from="/map" to="/gmap"/>
+		<param name="xmin" value="-20.0"/>
+		<param name="xmax" value="5.0"/>
+		<param name="ymin" value="-10.0"/>
+		<param name="ymax" value="5.0"/>
+	</node>
+
+	<!-- Node 4: map -->
+	<!-- <node name="map_server" pkg="map_server" type="map_server" args = "$(find autodrive)/map/map.yaml" output="screen"/> -->
+
+	<!-- Node 5: rviz -->
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find autodrive)/config/config.rviz" output="screen"/>
+</launch>
