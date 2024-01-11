@@ -11,27 +11,24 @@ source devel/setup.bash
 #Pour voire les topics :
 rqt
 
-#Recupération du scan de la zone et calcul du SLAM
-rosrun gmapping slam_gmapping
+#Visualiser l'architecture
+rqt_graph
 
 #Lancement du visualisateur de la map
 rviz
 
+
+
+#Recupération du scan de la zone et calcul du SLAM
+rosrun gmapping slam_gmapping
 
 #Enregistrer la carte générée par gmapping et ses méta-données :
 rosrun map_server map_saver map:=gmap
 #où gmap est le nom du topic créé par gmapping. Nom décidé dans le launchfile
 #génère un fichier map.pgm et map.yaml, enregistrés là où est la console
 
-
 #Lancement de la simulation
 roslaunch minilab_simulation minilab_simulation.launch
-
-#Lancement du node pour le joystick
-rosrun joy joy_node 
-
-#Make 
-catkin_make
 
 #Lancement de la node voulu
 rosrun teleop joystick_node
@@ -39,11 +36,7 @@ rosrun teleop joystick_node
 #Lancement de la node de ROS récupérant les données du joystick
 rosrun joy joy_node
 
-#Lancement de rviz
-rviz
 
-#Visualiser l'architecture
-rqt_graph
 
 
 

@@ -1,4 +1,4 @@
-# include "include/autodrive/command_node.hpp"
+# include "../include/command_node.hpp"
 
 CommandNode::CommandNode() {
 	cmd_vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1000);
