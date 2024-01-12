@@ -177,6 +177,69 @@ void PlannifNode::sendStaticPotential(){
     pub_staticmap.publish(initPotential);
 }
 
+void PlannifNode::printMap(std_msgs::UInt8MultiArray& map, std::string nom) {
+	// Ouverture du fichier
+	//string nomFichier = "carte.pgm";
+	std::ofstream wf(nom + ".pgm", std::ios::out | std::ios::binary | std::ios::trunc);
+	if (!wf) {
+			std::cout << "Cannot open file!" << std::endl;
+			return;
+	}
+	
+	// Création de la métadata du pgm
+	char metaData[128] = "P5\n";
+	
+	size_t metaDataSize = 3;
+
+	uint32_t width = map.layout.dim[1].size;
+	uint32_t height = map.layout.dim[0].size;
+	if (width && height) {
+		uint16_t valMax = 100; // trouver la bonne valMax :(
+		char tampon[16];
+		uint8_t tamponSize = 0;
+
+		// Récupération des métadonnées sous forme ASCII avec retours de ligne
+		uint64_t dec=1;
+		while (dec <= width) {
+			tampon[tamponSize++] = '0' + (width % (dec * 10))/ dec;
+			dec *= 10;
+		}
+		do {
+			metaData[metaDataSize++] = tampon[--tamponSize];
+		} while (tamponSize > 0);
+		
+		metaData[metaDataSize++] = ' ';
+		
+		dec = 1;
+		while (dec <= height) {
+			tampon[tamponSize++] = '0' + (height % (dec * 10))/ dec;
+			dec *= 10;
+		}
+		do {
+			metaData[metaDataSize++] = tampon[--tamponSize];
+		} while (tamponSize > 0);
+		
+		metaData[metaDataSize++] = '\n';
+		
+		dec = 1;
+		while (dec <= valMax) {
+			tampon[tamponSize++] = '0' + (valMax % (dec * 10))/ dec;
+			dec *= 10;
+		}
+		do {
+			metaData[metaDataSize++] = tampon[--tamponSize];
+		} while (tamponSize > 0);
+
+		metaData[metaDataSize++] = '\n';
+
+		// impression de la métadata dans le fichier
+		wf.write((char*)metaData, metaDataSize);
+		
+		// Impression de la carte dans le fichier
+		wf.write((char*)map.data.data(), (size_t)(width*height));
+	}
+}
+
 
 int main(int argc, char **argv)
 {

@@ -7,7 +7,10 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "nav_msgs/Odometry.h"
+
 #include <sstream>
+#include <fstream>
+#include <iostream>
 
 #define TAILLE_FILTRE_WALL 3
 #define WALL_COEFF_A 10
@@ -63,6 +66,8 @@ class PlannifNode {
 
         void preCalculateFilter(uint8_t* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB);
         void applyFilter(std_msgs::UInt8MultiArray* mapPotential, uint8_t* filter_, int indice, uint8_t delta);
+        
+        void printMap(std_msgs::UInt8MultiArray& map, std::string nom);
 };
 
 #endif // PLANNIF_NODE_HPP

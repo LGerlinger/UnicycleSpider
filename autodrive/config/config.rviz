@@ -6,6 +6,7 @@ Panels:
       Expanded:
         - /Global Options1
         - /Status1
+        - /Map1
       Splitter Ratio: 0.5
     Tree Height: 343
   - Class: rviz/Selection
@@ -57,7 +58,7 @@ Visualization Manager:
       Draw Behind: false
       Enabled: true
       Name: Map
-      Topic: /map
+      Topic: /gmap
       Unreliable: false
       Use Timestamp: false
       Value: true
@@ -203,7 +204,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 17.9731388092041
+      Distance: 19.128782272338867
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -211,17 +212,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -6.780123233795166
-        Y: -1.5233993530273438
-        Z: 1.770427942276001
+        X: -3.741675853729248
+        Y: -0.11850780248641968
+        Z: -2.7831008434295654
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.8903979659080505
+      Pitch: 0.6153982281684875
       Target Frame: <Fixed Frame>
-      Yaw: 1.5453968048095703
+      Yaw: 0.15539707243442535
     Saved:
       - Class: rviz/Orbit
         Distance: 17.9731388092041
@@ -259,5 +260,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 1366
-  X: 0
+  X: 70
   Y: 27

@@ -10,7 +10,7 @@ CommandNode::CommandNode() {
 	height = 1;
 }
 
-void CommandNode::Map2Command() {
+void CommandNode::Map2Command() {/*
 	// pose est sensée être dans le tableau
 	float nouveauGradient[2] = {0,0};
 	uint32_t posX = round(posture[0]);
@@ -52,24 +52,24 @@ void CommandNode::Map2Command() {
 	//
 	// ROS_INFO("%s", msg.data.c_str());
 
-	cmd_vel_pub.publish(msg);
+	cmd_vel_pub.publish(msg);*/
 }
 
-void CommandNode::getMapCallback(const std_msgs::UInt8MultiArray& msg) {
+void CommandNode::getMapCallback(const std_msgs::UInt8MultiArray& msg) {/*
 	if (height != msg.layout.dim[0].size || width != msg.layout.dim[1].size) {
 		free(map);
 	}
 	width = msg.layout.dim[1].size;
 	height = msg.layout.dim[0].size;
 	map = (uint8_t*)malloc((size_t) (width * height));
-	memcpy(map, &msg.data, (size_t) (width * height));
+	memcpy(map, &msg.data, (size_t) (width * height));*/
 }
 
-void CommandNode::getOdomCallback(const nav_msgs::Odometry& msg) {
+void CommandNode::getOdomCallback(const nav_msgs::Odometry& msg) {/*
 	posture[0] = msg.pose.pose.position.x;
 	posture[1] = msg.pose.pose.position.y;
 	auto orientation = &(msg.pose.pose.orientation); // ça marche ?? Je sais pas :/
-	posture[2] = atan2(2 * (orientation->w * orientation->z + orientation->x * orientation->y), 1 - 2 * (orientation->y*orientation->y + orientation->z*orientation->z));
+	posture[2] = atan2(2 * (orientation->w * orientation->z + orientation->x * orientation->y), 1 - 2 * (orientation->y*orientation->y + orientation->z*orientation->z));*/
 }
 
 
@@ -77,6 +77,7 @@ void CommandNode::getOdomCallback(const nav_msgs::Odometry& msg) {
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "command_node");
+	ros::NodeHandle n;
 	ros::Rate loop_rate(10);
 	while (ros::ok())
 	{
