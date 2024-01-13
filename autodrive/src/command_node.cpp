@@ -10,7 +10,12 @@ CommandNode::CommandNode() {
 	height = 1;
 }
 
-void CommandNode::Map2Command() {/*
+CommandNode::~CommandNode() {
+	if (map != NULL) free(map);
+}
+
+
+void CommandNode::Map2Command() {
 	// pose est sensée être dans le tableau
 	float nouveauGradient[2] = {0,0};
 	uint32_t posX = round(posture[0]);
@@ -36,6 +41,9 @@ void CommandNode::Map2Command() {/*
 	
 	nouveauGradient[1] *= -1;
 	nouveauGradient[1] += coefMomentum * gradient[1];
+	
+	ROS_INFO("CommandNode::Map2Command() -- grad=(%f, %f)\n", nouveauGradient[0], nouveauGradient[1]);
+	
 	float norme = sqrt(nouveauGradient[0] * nouveauGradient[0] + nouveauGradient[1] * nouveauGradient[1]);
 
 	// Transformer le sens en commande vitesse linéaire + angulaire
@@ -49,27 +57,31 @@ void CommandNode::Map2Command() {/*
 	msg.angular.z = diffAngle/2;
 	
 	msg.linear.x = coefCommande * abs(diffAngle)/M_PI * norme;
-	//
-	// ROS_INFO("%s", msg.data.c_str());
 
-	cmd_vel_pub.publish(msg);*/
+	cmd_vel_pub.publish(msg);
 }
 
-void CommandNode::getMapCallback(const std_msgs::UInt8MultiArray& msg) {/*
+void CommandNode::getMapCallback(const std_msgs::UInt8MultiArray& msg) {
 	if (height != msg.layout.dim[0].size || width != msg.layout.dim[1].size) {
 		free(map);
+		height = msg.layout.dim[0].size;
+		width = msg.layout.dim[1].size;
+		map = (uint8_t*)malloc((size_t) (width * height));
+		if (map == NULL) {
+			ROS_INFO("CommandNode::getMapCallback -> échec de l'allocation mémoire\n");
+			ROS_INFO("CommandNode::getMapCallback -> height : %d,  width : %d,  mémoire demandée : %d\n", height, width, height*width);
+		}
 	}
-	width = msg.layout.dim[1].size;
-	height = msg.layout.dim[0].size;
-	map = (uint8_t*)malloc((size_t) (width * height));
-	memcpy(map, &msg.data, (size_t) (width * height));*/
+	memcpy(map, &msg.data, (size_t) (width * height));
+	ROS_INFO("CommandNode::getMapCallback, height : %d,  width : %d\n", height, width);
 }
 
-void CommandNode::getOdomCallback(const nav_msgs::Odometry& msg) {/*
+void CommandNode::getOdomCallback(const nav_msgs::Odometry& msg) {
 	posture[0] = msg.pose.pose.position.x;
 	posture[1] = msg.pose.pose.position.y;
 	auto orientation = &(msg.pose.pose.orientation); // ça marche ?? Je sais pas :/
-	posture[2] = atan2(2 * (orientation->w * orientation->z + orientation->x * orientation->y), 1 - 2 * (orientation->y*orientation->y + orientation->z*orientation->z));*/
+	posture[2] = atan2(2 * (orientation->w * orientation->z + orientation->x * orientation->y), 1 - 2 * (orientation->y*orientation->y + orientation->z*orientation->z));
+	ROS_INFO("CommandNode::getOdomCallback, posture : [%f, %f, %f]\n", posture[0], posture[1], posture[2]);
 }
 
 

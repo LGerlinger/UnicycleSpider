@@ -29,6 +29,7 @@
 class PlannifNode {
     public:
         PlannifNode();
+        ~PlannifNode();
         void sendStaticPotential();
 
         

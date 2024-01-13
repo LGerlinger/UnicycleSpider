@@ -21,6 +21,7 @@
 class CommandNode {
 public:
 	CommandNode();
+	~CommandNode();
 	
 	void Map2Command();
 	

@@ -13,6 +13,26 @@ PlannifNode::PlannifNode(){
 
 }
 
+PlannifNode::~PlannifNode() {
+	// Je crois que normalement les vecteurs sont vidés à la destruction des objets
+	// mais je fais ça pour m'en assurer.
+	initPotential.data.clear();
+	initPotential.data.resize(0);
+	
+	goalPotential.data.clear();
+	goalPotential.data.resize(0);
+	
+	tracePotential.data.clear();
+	tracePotential.data.resize(0);
+	
+	staticPotential.data.clear();
+	staticPotential.data.resize(0);
+	
+	delete[] map_data;
+	delete[] wallFilter;
+	delete[] traceFilter;
+}
+
 void PlannifNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
     //MAJ actualPosition
     actualPosition[0] = msg->pose.pose.position.x;
@@ -20,6 +40,10 @@ void PlannifNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
 }
 
 void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
+	ROS_INFO("PlannifNode::goalCallback -> goal : (%f, %f),   msg : (%f, %f)\n",
+		goal_point[0], goal_point[1],
+		msg->pose.position.x, msg->pose.position.y
+	);
     if(goal_point[0] != msg->pose.position.x || goal_point[1] != msg->pose.position.y){
         goal_point[0] = msg->pose.position.x;
         goal_point[1] = msg->pose.position.y;
@@ -51,7 +75,9 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
 
 void PlannifNode::initMaps(uint32_t width_, uint32_t height_, float resolution_){
     size_t totalSize = width_ * height_ * sizeof(uint8_t);
-
+		// Inversion par rapport à la doc. Je ne sais pas si c'est grave ??
+		// normalement dim[0]<=>"height"
+		// et					 dim[1]<=>"width" 
     initPotential.layout.dim[0].label = "width";
     initPotential.layout.dim[0].size = width_;
     initPotential.layout.dim[1].label = "height";
@@ -120,6 +146,7 @@ void PlannifNode::calculInitPotential(){
 }
 
 void PlannifNode::calculGoalPotential(){
+		ROS_INFO("PlannifNode::calculGoalPotential\n");
     int delta = 0;
     int distance_goal = 0;
 
@@ -129,9 +156,11 @@ void PlannifNode::calculGoalPotential(){
     
     dist[0] = sqrt((goal_point[0])*(goal_point[0]) 
                 + (goal_point[1])*(goal_point[1]));
+		ROS_INFO("PlannifNode::calculGoalPotential -> dist[0]=%f\n", dist[0]);
 
     dist[1] = sqrt((goal_point[0]-goalPotential.layout.dim[0].size)*(goal_point[0]-goalPotential.layout.dim[0].size) 
                 + (goal_point[1])*(goal_point[1]));
+		ROS_INFO("PlannifNode::calculGoalPotential -> dist[1]=%f\n", dist[1]);
     dist[2] = sqrt((goal_point[0])*(goal_point[0]) 
                 + (goal_point[1]-goalPotential.layout.dim[1].size)*(goal_point[1]-goalPotential.layout.dim[1].size));
 
@@ -143,11 +172,11 @@ void PlannifNode::calculGoalPotential(){
             distMax = dist[i];
         }
     }
-
+    
     //Calcul pente
     float pente = (GOAL_VAL_MAX - GOAL_VAL_MIN) / distMax;
-    for(uint32_t y=delta; y<(goalPotential.layout.dim[1].size-delta); y++){
-        for(uint32_t x=delta; x<(goalPotential.layout.dim[0].size-delta); x++){
+    for(uint32_t y=0; y<(goalPotential.layout.dim[1].size); y++){
+        for(uint32_t x=0; x<(goalPotential.layout.dim[0].size); x++){
             distance_goal = sqrt((goal_point[0]-x)*(goal_point[0]-x) 
                                         + (goal_point[1]-y)*(goal_point[1]-y));
             goalPotential.data[x + y*goalPotential.layout.dim[0].size] = distance_goal * pente + GOAL_VAL_MIN;
