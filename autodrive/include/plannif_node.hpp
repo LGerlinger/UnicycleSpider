@@ -16,10 +16,10 @@
 #define WALL_COEFF_A 10
 #define WALL_COEFF_B 0.8
 
-#define GOAL_VAL_MAX 33
+#define GOAL_VAL_MAX 85
 #define GOAL_VAL_MIN 0
 
-#define TAILLE_FILTRE_TRACE 6
+#define TAILLE_FILTRE_TRACE 7 // PAS DE FILTRE DE TAILLE PAIRE !!
 #define TRACE_COEFF_A 20
 #define TRACE_COEFF_B 0.4
 #define TAILLE_MAX_TRACE 10
@@ -47,12 +47,12 @@ class PlannifNode {
 
         double goal_point[2];
 
-        uint8_t* map_data;
-        uint8_t* wallFilter;
-        uint8_t* traceFilter; 
+        uint8_t* map_data = nullptr;
+        float wallFilter[TAILLE_FILTRE_WALL*TAILLE_FILTRE_WALL];
+        float traceFilter[TAILLE_FILTRE_TRACE*TAILLE_FILTRE_TRACE]; 
 
-        uint8_t wallDelta;
-        uint8_t traceDelta;
+        uint8_t wallDelta = 0;
+        uint8_t traceDelta = 0;
 
         std::vector<std::array<float, 2>> pastPosition;
         float actualPosition[2] = {0.0, 0.0};
@@ -65,10 +65,10 @@ class PlannifNode {
         void calculGoalPotential();
         void calculTracePotential(const ros::TimerEvent& event);
 
-        void preCalculateFilter(uint8_t* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB);
-        void applyFilter(std_msgs::UInt8MultiArray* mapPotential, uint8_t* filter_, int indice, uint8_t delta);
+        void preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB);
+        void applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, int coef);
         
-        void printMap(std_msgs::UInt8MultiArray& map, std::string nom);
+        void printMap(std_msgs::UInt8MultiArray& map, std::string nom, uint16_t valMax);
 };
 
 #endif // PLANNIF_NODE_HPP
