@@ -73,10 +73,10 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
     initMaps(msg->info.width, msg->info.height, msg->info.resolution);
 
     wallDelta = TAILLE_FILTRE_WALL/2;
-    preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_COEFF_A, WALL_COEFF_B);
+    preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_COEFF_A, WALL_COEFF_B, WALL_MULT);
 
     traceDelta = TAILLE_FILTRE_TRACE/2;
-    preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_COEFF_A, TRACE_COEFF_B);
+    preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_COEFF_A, TRACE_COEFF_B, TRACE_MULT);
     
     calculInitPotential();
 
@@ -127,18 +127,32 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_, float resolution_)
 /**
 * @bug Il y a un dépassement de mémoire si taille_filtre est pair.
 */
-void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB){
-	ROS_INFO("PlannifNode::preCalculateFilter(filter, delta=%d, taille_filtre=%d,  coeffA=%f,  coeffB=%f)\n",
-		delta, taille_filtre, coeffA, coeffB
+void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB, float mult){
+	ROS_INFO("PlannifNode::preCalculateFilter(filter, delta=%d, taille_filtre=%d,  coeffA=%f,  coeffB=%f, mult=%f)\n",
+		delta, taille_filtre, coeffA, coeffB, mult
 	);
-    int distance_centre = 0;
-
+    float distance_centre = 0;
+    uint16_t indice=0;
+		float somme=0;
+    printf("\n");
     for(int y=-delta; y<delta+1; y++){
         for(int x=-delta; x<delta+1; x++){
             distance_centre = sqrt(x*x + y*y);
             filter_[x+delta + (y+delta)*taille_filtre] = 
+            //filter_[indice] =
                 coeffA * exp(-coeffB*distance_centre*distance_centre);
+            somme += filter_[x+delta + (y+delta)*taille_filtre];
+            indice++;
         }
+    }
+    float rapport = mult * (float)GOAL_VAL_MAX / OCCUPANCYGRID_VAL_MAX;
+    ROS_INFO("double boucle passee, somme=%f,   filtre multiplie par %f", somme, rapport/somme);
+    for(int y=-delta; y<delta+1; y++){
+    	for(int x=-delta; x<delta+1; x++){
+		  	filter_[x+delta + (y+delta)*taille_filtre] *= rapport / somme;
+        printf("%f\t", filter_[x+delta + (y+delta)*taille_filtre]);
+    	}
+      printf("\n");
     }
 }
 
@@ -166,9 +180,12 @@ void PlannifNode::calculInitPotential(){
     for(uint32_t y=wallDelta; y<(initPotential.layout.dim[0].size-wallDelta); y++){
         for(uint32_t x=wallDelta; x<(initPotential.layout.dim[1].size-wallDelta); x++){
             indice = x + (y*initPotential.layout.dim[1].size);
-            if(map_data[indice] > 0){
+            if(map_data[indice] < 101){
                 //faire le filtre
                 applyFilter(&initPotential, wallFilter, indice, wallDelta, map_data[indice]);
+            }
+            else {
+            	initPotential.data[indice] = 0;
             }
         }
     }
