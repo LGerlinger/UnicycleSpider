@@ -10,8 +10,8 @@ PlannifNode::PlannifNode(){
     sub_map_ = nh_.subscribe("/gmap", 1, &PlannifNode::mapCallback, this);
     sub_goal_ = nh_.subscribe("move_base_simple/goal", 1, &PlannifNode::goalCallback, this);
     sub_odom_ = nh_.subscribe("/odom", 1, &PlannifNode::odomCallback, this);
-    ros::Timer timer = nh_.createTimer(ros::Duration(CALCUL_TRACE_MAP_HZ), &PlannifNode::calculTracePotential, this);
-
+    timer = nh_.createTimer(ros::Duration(CALCUL_TRACE_MAP_HZ), &PlannifNode::calculTracePotential, this);
+    timer2 = nh_.createTimer(ros::Duration(SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
 }
 
 PlannifNode::~PlannifNode() {
@@ -43,8 +43,8 @@ void PlannifNode::odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
 	//	msg->pose.pose.position.y
 	//);
     //MAJ actualPosition
-    actualPosition[0] = msg->pose.pose.position.x;
-    actualPosition[1] = msg->pose.pose.position.y;
+    actualPosition[0] = msg->pose.pose.position.x + MAP_OFFSET_X;
+    actualPosition[1] = msg->pose.pose.position.y + MAP_OFFSET_Y;
 }
 
 void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
@@ -52,9 +52,9 @@ void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
 		goal_point[0], goal_point[1],
 		msg->pose.position.x, msg->pose.position.y
 	);
-    if(goal_point[0] != msg->pose.position.x || goal_point[1] != msg->pose.position.y){
-        goal_point[0] = msg->pose.position.x;
-        goal_point[1] = msg->pose.position.y;
+    if(goal_point[0] != msg->pose.position.x + MAP_OFFSET_X || goal_point[1] != msg->pose.position.y + MAP_OFFSET_Y){
+        goal_point[0] = msg->pose.position.x + MAP_OFFSET_X;
+        goal_point[1] = msg->pose.position.y + MAP_OFFSET_Y;
         //Recalcul map 
         calculGoalPotential();
     }
@@ -160,9 +160,9 @@ void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_f
 * @param signe =-1 ou =1 dépendamment de si on veut additioner ou soustraire le filtre
 */
 void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, int coef){
-	//ROS_INFO("PlannifNode::applyFilter(mapPotential = %p, filter_, indice=%d,  delta=%d)\n",
-	//	mapPotential, indice, delta
-	//);
+	// ROS_INFO("PlannifNode::applyFilter(mapPotential = %p, filter_, indice=%d,  delta=%d)\n",
+	// 	mapPotential, indice, delta
+	// );
     uint16_t i = 0;
     int ligne = 0;
     for(int y=-delta; y<delta+1; y++){
@@ -180,6 +180,7 @@ void PlannifNode::calculInitPotential(){
     for(uint32_t y=wallDelta; y<(initPotential.layout.dim[0].size-wallDelta); y++){
         for(uint32_t x=wallDelta; x<(initPotential.layout.dim[1].size-wallDelta); x++){
             indice = x + (y*initPotential.layout.dim[1].size);
+
             if(map_data[indice] < 101){
                 //faire le filtre
                 applyFilter(&initPotential, wallFilter, indice, wallDelta, map_data[indice]);
@@ -193,7 +194,7 @@ void PlannifNode::calculInitPotential(){
 }
 
 void PlannifNode::calculGoalPotential(){
-		ROS_INFO("PlannifNode::calculGoalPotential()\n");
+    ROS_INFO("PlannifNode::calculGoalPotential()\n");
     int delta = 0;
     int distance_goal = 0;
 
@@ -219,25 +220,33 @@ void PlannifNode::calculGoalPotential(){
         }
     }
     
+    ROS_INFO("PlannifNode::calculGoalPotential() Calcul pente %f\n", distMax);
+    ROS_INFO("PlannifNode::calculGoalPotential() Goal : %f et %f\n", goal_point[0], goal_point[1]);
+
     //Calcul pente
     float pente = (GOAL_VAL_MAX - GOAL_VAL_MIN) / distMax;
     for(uint32_t y=0; y<(goalPotential.layout.dim[0].size); y++){
         for(uint32_t x=0; x<(goalPotential.layout.dim[1].size); x++){
+            //Calcul de la distance au goal
             distance_goal = sqrt((goal_point[0]-x)*(goal_point[0]-x) 
                                         + (goal_point[1]-y)*(goal_point[1]-y));
+            //Application du filtre
             goalPotential.data[x + y*goalPotential.layout.dim[1].size] = distance_goal * pente + GOAL_VAL_MIN;
         }
     }
-    
+
+    ROS_INFO("PlannifNode::calculGoalPotential() END\n");
     printMap(goalPotential, "goalPotential", GOAL_VAL_MAX);
 }
 
 void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
 	ROS_INFO("PlannifNode::calculTracePotential(const ros::TimerEvent& event)\n");
 
-    uint32_t indice = pastPosition[0][0] + (pastPosition[0][1]*tracePotential.layout.dim[1].size);
-    applyFilter(&tracePotential, traceFilter, indice, traceDelta, -1);
-	
+    uint32_t indice;
+    // = pastPosition[0][0] + (pastPosition[0][1]*tracePotential.layout.dim[1].size);
+    // applyFilter(&tracePotential, traceFilter, indice, traceDelta, -1);
+    // ROS_INFO("PlannifNode::calculTracePotential Aprés filter\n");
+
 		//Met à jour le vecteur pastPositions
     if(pastPosition.size()==TAILLE_MAX_TRACE){
         pastPosition.erase(pastPosition.begin());
@@ -249,18 +258,37 @@ void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
         indice = pastPosition[i][0] + (pastPosition[i][1]*tracePotential.layout.dim[1].size);
         applyFilter(&tracePotential, traceFilter, indice, traceDelta, 1);
     }
+
+    printMap(tracePotential, "tracePotential", GOAL_VAL_MAX);
 }   
 
-void PlannifNode::sendStaticPotential(){
+void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
 	ROS_INFO("PlannifNode::sendStaticPotential()\n");
     //Faire l'addition de toutes les maps 
+    addPotentialToStatic(initPotential, 1);
+    addPotentialToStatic(goalPotential, 1);
+    addPotentialToStatic(tracePotential, 1);
 
-    //A CHANGER
-    pub_staticmap.publish(initPotential);
+    //Affichage de la map
+    printMap(staticPotential, "staticPotential", GOAL_VAL_MAX);
+
+    //Envoyer la map sur le topic
+    pub_staticmap.publish(staticPotential);
+}
+
+
+void PlannifNode::addPotentialToStatic(std_msgs::UInt8MultiArray& mapPotential, int coeff){
+    int indice;
+    for(uint32_t y=0; y<(staticPotential.layout.dim[0].size); y++){
+        for(uint32_t x=0; x<(staticPotential.layout.dim[1].size); x++){
+            indice = x + y*staticPotential.layout.dim[1].size;
+            staticPotential.data[indice] += coeff*mapPotential.data[indice];
+        }
+    }
 }
 
 void PlannifNode::printMap(std_msgs::UInt8MultiArray& map, std::string nom, uint16_t valMax) {
-	ROS_INFO("PlannifNode::printMap(map, nom)\n");
+	// ROS_INFO("PlannifNode::printMap(map, nom)\n");
 	// Ouverture du fichier
 	std::ofstream wf("/home/catkin_ws/src/autodrive/mapdump/" + nom + ".pgm", std::ios::out | std::ios::binary | std::ios::trunc);
 	if (!wf) {
@@ -320,7 +348,7 @@ void PlannifNode::printMap(std_msgs::UInt8MultiArray& map, std::string nom, uint
 		// Impression de la carte dans le fichier
 		wf.write((char*)map.data.data(), (size_t)(width*height));
 	}
-	ROS_INFO("PlannifNode::printMap ~%d ko ecrits dans /home/catkin_ws/src/autodrive/mapdump/", width*height/1000);
+	// ROS_INFO("PlannifNode::printMap ~%d ko ecrits dans /home/catkin_ws/src/autodrive/mapdump/", width*height/1000);
 }
 
 
@@ -331,15 +359,5 @@ int main(int argc, char **argv)
     PlannifNode node;
 
     ros::spin();
-    ros::Rate loop_rate(10);
-
-    while (ros::ok())
-    {
-        //Mettre actions
-        node.sendStaticPotential();
-
-        ros::spinOnce();
-        loop_rate.sleep();
-    }
     return 0;
 }

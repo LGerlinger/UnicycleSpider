@@ -27,13 +27,16 @@
 #define TRACE_MULT 100
 #define TAILLE_MAX_TRACE 10
 #define CALCUL_TRACE_MAP_HZ 1.0
+#define SEND_MAP_HZ 1.5
+
+#define MAP_OFFSET_X 0
+#define MAP_OFFSET_Y 0
 
 
 class PlannifNode {
     public:
         PlannifNode();
         ~PlannifNode();
-        void sendStaticPotential();
 
         
     private:
@@ -42,6 +45,8 @@ class PlannifNode {
         ros::Subscriber sub_map_;
         ros::Subscriber sub_goal_;
         ros::Subscriber sub_odom_;
+        ros::Timer timer;
+        ros::Timer timer2;
 
         std_msgs::UInt8MultiArray initPotential;
         std_msgs::UInt8MultiArray goalPotential;
@@ -67,10 +72,12 @@ class PlannifNode {
         void calculInitPotential();
         void calculGoalPotential();
         void calculTracePotential(const ros::TimerEvent& event);
+        void sendStaticPotential(const ros::TimerEvent& event);
 
         void preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB, float mult);
         void applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, int coef);
         
+        void addPotentialToStatic(std_msgs::UInt8MultiArray& mapPotential, int coeff);
         void printMap(std_msgs::UInt8MultiArray& map, std::string nom, uint16_t valMax);
 };
 
