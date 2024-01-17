@@ -6,13 +6,14 @@
 	<!-- Node 1: plannif_node -->
 	<node name="plannif_node" pkg="autodrive" type="plannif_node" output="screen"/>
 	
-	<!-- Node 1: plannif_node -->
+	<!-- Node 2: command_node -->
 	<node name="command_node" pkg="autodrive" type="command_node" output="screen"/>
 	
 
 	<!-- Node 3: gmapping -->
 	<node name="slam_node" pkg="gmapping" type="slam_gmapping" output="screen">
 		<remap from="/map" to="/gmap"/>
+		<param name="odom_frame" value="/odom"/>
 		<param name="xmin" value="-20.0"/>
 		<param name="xmax" value="5.0"/>
 		<param name="ymin" value="-10.0"/>
