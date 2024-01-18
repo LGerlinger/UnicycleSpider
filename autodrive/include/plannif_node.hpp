@@ -10,7 +10,7 @@
 #include "nav_msgs/Odometry.h"
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/TransformStamped.h>
-
+#include <std_msgs/Bool.h>
 
 #include <sstream>
 #include <fstream>
@@ -45,14 +45,16 @@ class PlannifNode {
         PlannifNode();
         ~PlannifNode();
 
-        
     private:
         ros::NodeHandle nh_;
         ros::Publisher pub_staticmap;
+        ros::Subscriber sub_activation_;
         ros::Subscriber sub_map_;
         ros::Subscriber sub_goal_;
         ros::Timer timer;
         ros::Timer timer2;
+        ros::Timer timer_goal;
+        
         tf2_ros::Buffer tfBuffer;
         tf2_ros::TransformListener tfListener;
 
@@ -60,6 +62,8 @@ class PlannifNode {
         std_msgs::UInt8MultiArray goalPotential;
         std_msgs::UInt8MultiArray tracePotential;
         std_msgs::UInt8MultiArray staticPotential;
+
+        bool first_init = true;
 
         double goal_point[2];
 
@@ -77,8 +81,9 @@ class PlannifNode {
         std::vector<std::array<float, 2>> pastPosition;
         float actualPosition[2] = {0.0, 0.0};
         
-        
+        void changeState(const std_msgs::Bool::ConstPtr& stop);
         void goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+        void checkMapInit4Goal(const ros::TimerEvent& event);
         void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
         void initMaps(uint32_t width_, uint32_t height_);
         void calculInitPotential();

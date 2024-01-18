@@ -8,9 +8,11 @@
 	
 	<!-- Node 2: command_node -->
 	<node name="command_node" pkg="autodrive" type="command_node" output="screen"/>
-	
 
-	<!-- Node 3: gmapping -->
+	<!-- Node 3: manager_node -->
+	<node name="manager_node" pkg="autodrive" type="manager_node" output="screen"/>
+
+	<!-- Node 4: gmapping -->
 	<node name="slam_node" pkg="gmapping" type="slam_gmapping" output="screen">
 		<remap from="/map" to="/gmap"/>
 		<param name="odom_frame" value="/odom"/>
@@ -20,9 +22,9 @@
 		<param name="ymax" value="5.0"/>
 	</node>
 
-	<!-- Node 4: map -->
+	<!-- Node 5: map -->
 	<!-- <node name="map_server" pkg="map_server" type="map_server" args = "$(find autodrive)/map/map.yaml" output="screen"/> -->
 
-	<!-- Node 5: rviz -->
+	<!-- Node 6: rviz -->
 	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find autodrive)/config/config.rviz" output="screen"/>
 </launch>

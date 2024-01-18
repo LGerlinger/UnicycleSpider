@@ -9,12 +9,11 @@ PlannifNode::PlannifNode() : tfBuffer(), tfListener(tfBuffer){
     originMap.position.x = -20;
     originMap.position.y = -10;
 
-    //Sub, Pub et timer
+    //Init Sub, Pub et timer
     pub_staticmap = nh_.advertise<std_msgs::UInt8MultiArray>("stc_pot", 1000);
-    sub_map_ = nh_.subscribe("/gmap", 1, &PlannifNode::mapCallback, this);
-    sub_goal_ = nh_.subscribe("move_base_simple/goal", 1, &PlannifNode::goalCallback, this);
-    timer = nh_.createTimer(ros::Duration(CALCUL_TRACE_MAP_HZ), &PlannifNode::calculTracePotential, this);
     
+    sub_goal_ = nh_.subscribe("my_goal", 1, &PlannifNode::goalCallback, this);
+    sub_activation_ = nh_.subscribe("rbt_actv", 1, &PlannifNode::changeState, this);
 }
 
 PlannifNode::~PlannifNode() {
@@ -38,15 +37,57 @@ PlannifNode::~PlannifNode() {
 	staticPotential.layout.dim.resize(0);
 
 	delete[] map_data;
+
+    sub_activation_.shutdown();
+    sub_goal_.shutdown();
+    sub_map_.shutdown();
+    timer.stop();
+    timer2.stop();
 }
 
+void PlannifNode::changeState(const std_msgs::Bool::ConstPtr& stop){
+    // ROS_INFO("PLANNIF : changeState %d et %d", stop->data, first_init);
+    if(stop->data){
+        //Goal atteint
+        //Eteindre les topics et les timers requis
+        sub_map_.shutdown();
+        timer.stop();
+        timer2.stop();
+
+        //Clean les maps
+        std::fill(goalPotential.data.begin(), goalPotential.data.end(), 0);
+        std::fill(tracePotential.data.begin(), goalPotential.data.end(), 0);
+        
+        first_init = true;
+    }
+    //Seulement si on rallume la node
+    else if(first_init){
+        sub_map_ = nh_.subscribe("/gmap", 1, &PlannifNode::mapCallback, this);
+        timer = nh_.createTimer(ros::Duration(1.0f/CALCUL_TRACE_MAP_HZ), &PlannifNode::calculTracePotential, this);
+    }
+}
 
 void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
-	
-    goal_point[0] = (msg->pose.position.x - originMap.position.x)/resolution;
-    goal_point[1] = goalPotential.layout.dim[0].size - (msg->pose.position.y - originMap.position.y)/resolution -1;
-    //Recalcul map 
-    calculGoalPotential();
+    
+    goal_point[0] = msg->pose.position.x;
+    goal_point[1] = msg->pose.position.y;
+    timer_goal = nh_.createTimer(ros::Duration(0.5f), &PlannifNode::checkMapInit4Goal, this);
+}
+
+void PlannifNode::checkMapInit4Goal(const ros::TimerEvent& event){
+    if(first_init){
+        // ROS_INFO("PLANNIF : pas de map donc pas de calcul de goal");
+    }else{
+        // ROS_INFO("PLANNIF : get nouveau goal");
+        goal_point[0] = (goal_point[0] - originMap.position.x)/resolution;
+        goal_point[1] = goalPotential.layout.dim[0].size - (goal_point[1] - originMap.position.y)/resolution -1;
+        
+        //Recalcul map 
+        calculGoalPotential();
+
+        //Stop le timer
+        timer_goal.stop();
+    }
 }
 
 void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
@@ -54,27 +95,33 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
 	// 	msg->info.width,
 	// 	msg->info.height
 	// );
-    //Initialise toutes les données
+    // ROS_INFO("PLANNIF : mapCallback");
+    if(first_init){
+        //Initialise toutes les données
+        // ROS_INFO("PLANNIF : mapCallback first init");
+        //Récupére l'origine de la map (en m)
+        originMap = msg->info.origin;
+        resolution = msg->info.resolution;
+
+        initMaps(msg->info.width, msg->info.height);
+
+        wallDelta = TAILLE_FILTRE_WALL/2;
+        preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_COEFF_A, WALL_COEFF_B, WALL_MULT);
+
+        traceDelta = TAILLE_FILTRE_TRACE/2;
+        preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_COEFF_A, TRACE_COEFF_B, TRACE_MULT);
+        
+        timer2 = nh_.createTimer(ros::Duration(1.0f/SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
+        first_init = false;
+    }
+
+    //Copie la map reçu dans les données à traiter
     const std::vector<signed char>& data_vector = msg->data;
     map_data = new uint8_t[data_vector.size()];
     std::copy(data_vector.begin(), data_vector.end(), map_data);
-    //Récupére l'origine de la map (en m ?)
-    originMap = msg->info.origin;
-    resolution = msg->info.resolution;
 
-    initMaps(msg->info.width, msg->info.height);
-
-    wallDelta = TAILLE_FILTRE_WALL/2;
-    preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_COEFF_A, WALL_COEFF_B, WALL_MULT);
-
-    traceDelta = TAILLE_FILTRE_TRACE/2;
-    preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_COEFF_A, TRACE_COEFF_B, TRACE_MULT);
-    
+    //calculduPotentiel
     calculInitPotential();
-
-    //On ne reçoit le message qu'une seule fois
-    sub_map_.shutdown();
-    timer2 = nh_.createTimer(ros::Duration(SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
 }
 
 void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
@@ -82,7 +129,8 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
 	// 	width_, height_
 	// );
     size_t totalSize = width_ * height_ * sizeof(uint8_t);
-		
+	
+    //InitPotential
 	initPotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
     initPotential.layout.dim[0].label = "height";
     initPotential.layout.dim[0].size = height_;
@@ -90,17 +138,17 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     initPotential.layout.dim[1].size = width_;
     initPotential.data.resize(totalSize);
     std::fill(initPotential.data.begin(), initPotential.data.end(), 0);
-    
 
-		staticPotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
-    staticPotential.layout.dim[0].label = "height";
-    staticPotential.layout.dim[0].size = height_;
-    staticPotential.layout.dim[1].label = "width";
-    staticPotential.layout.dim[1].size = width_;
-    staticPotential.data.resize(totalSize);
-    std::fill(staticPotential.data.begin(), initPotential.data.end(), 0);
+    //goalPotential
+    goalPotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
+    goalPotential.layout.dim[0].label = "height";
+    goalPotential.layout.dim[0].size = height_;
+    goalPotential.layout.dim[1].label = "width";
+    goalPotential.layout.dim[1].size = width_;
+    goalPotential.data.resize(totalSize);
 
-		tracePotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
+    //tracePotential
+    tracePotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
     tracePotential.layout.dim[0].label = "height";
     tracePotential.layout.dim[0].size = height_;
     tracePotential.layout.dim[1].label = "width";
@@ -108,13 +156,14 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     tracePotential.data.resize(totalSize);
     std::fill(tracePotential.data.begin(), initPotential.data.end(), 0);
 
-    goalPotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
-    goalPotential.layout.dim[0].label = "height";
-    goalPotential.layout.dim[0].size = height_;
-    goalPotential.layout.dim[1].label = "width";
-    goalPotential.layout.dim[1].size = width_;
-    goalPotential.data.resize(totalSize);
-    std::fill(goalPotential.data.begin(), goalPotential.data.end(), 0);
+    //staticPotential
+    staticPotential.layout.dim.resize(2, std_msgs::MultiArrayDimension());
+    staticPotential.layout.dim[0].label = "height";
+    staticPotential.layout.dim[0].size = height_;
+    staticPotential.layout.dim[1].label = "width";
+    staticPotential.layout.dim[1].size = width_;
+    staticPotential.data.resize(totalSize);
+    std::fill(staticPotential.data.begin(), initPotential.data.end(), 0);
 }
 
 /**
@@ -168,7 +217,7 @@ void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* fi
 }
 
 void PlannifNode::calculInitPotential(){
-	ROS_INFO("PlannifNode::calculInitPotential(), wallDelta=%d\n", wallDelta);
+	// ROS_INFO("PlannifNode::calculInitPotential(), wallDelta=%d\n", wallDelta);
     int indice;
     for(uint32_t y=wallDelta; y<(initPotential.layout.dim[0].size-wallDelta); y++){
         for(uint32_t x=wallDelta; x<(initPotential.layout.dim[1].size-wallDelta); x++){
@@ -184,15 +233,8 @@ x + ((initPotential.layout.dim[0].size-y-wallDelta-1)*initPotential.layout.dim[1
             else {
             	initPotential.data[indice] = 0;
             }
-            // if (map_data[indice] < 101){
-            //     initPotential.data[indice] = map_data[indice];
-            // }
-            // else {
-            //     initPotential.data[indice] = 0;
-            // }
         }
     }
-    printMap(initPotential, "initPotential", GOAL_VAL_MAX);
 }
 
 void PlannifNode::calculGoalPotential(){
@@ -238,7 +280,7 @@ void PlannifNode::calculGoalPotential(){
     }
 
     // ROS_INFO("PlannifNode::calculGoalPotential() END\n");
-    printMap(goalPotential, "goalPotential", GOAL_VAL_MAX);
+    
 }
 
 void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
@@ -273,8 +315,6 @@ void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
         pastPosition.erase(pastPosition.begin());
     }
     pastPosition.push_back({actualPosition[0], actualPosition[1]});
-
-    printMap(tracePotential, "tracePotential", GOAL_VAL_MAX);
 }   
 
 void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
@@ -285,7 +325,10 @@ void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
     addPotentialToStatic(goalPotential, 1);
     addPotentialToStatic(tracePotential, 1);
 
-    //Affichage de la map
+    //Affichage des maps    
+    printMap(initPotential, "initPotential", GOAL_VAL_MAX);
+    printMap(goalPotential, "goalPotential", GOAL_VAL_MAX);
+    printMap(tracePotential, "tracePotential", GOAL_VAL_MAX);
     printMap(staticPotential, "staticPotential", 255);
 
     //Envoyer la map sur le topic
