@@ -1,3 +1,5 @@
+
+######################LANCEMENT######################
 #Pour lancer le bash
 ./start_docker.bash # if you haven't launched a Docker terminal already
 terminator # run this once you're in the Docker container
@@ -8,6 +10,7 @@ catkin_make
 source devel/setup.bash
 
 
+######################INFO ROS######################
 #Pour voire les topics :
 rqt
 
@@ -45,9 +48,26 @@ rviz
 #Visualiser l'architecture
 rqt_graph
 
+######################CONNEXION ROBOT######################
+#Brancher la manette avant tout !
+#Lancer le terminator
+#Connexion au wifi du robot
 
+#Ajouter lignes à la fin de bashrc : $ nano ~/.bashrc  
+export ROS_MASTER_URI=http://192.168.0.200:11311
+export ROS_IP=192.168.0.102 
+-> pas forcement 102 -> voir avec $ ifconfig
 
+#Sourcer !!!
+source ~/.bashrc
 
+##Coté robot :
+source devel/setup.bash
+ssh user@192.168.0.200
+(mdp : #user)
+roslaunch minilab_launch minilab_driver_hokuyo.launch
+
+######################AUTRE######################
 #Lancement SC
 sudo code --verbose --user-data-dir --no-sandbox
 
