@@ -20,7 +20,7 @@ CommandNode::CommandNode(): tfBuffer(), tfListener(tfBuffer) {
 		}	
 	}
 
-	timer = nh_.createTimer(ros::Duration(SEND_CMD_HZ), &CommandNode::Map2Command, this);
+	timer = nh_.createTimer(ros::Duration(1.f/SEND_CMD_HZ), &CommandNode::Map2Command, this);
 }
 
 CommandNode::~CommandNode() {
@@ -32,18 +32,27 @@ void CommandNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 	originMap = msg->info.origin;
 	resolution = msg->info.resolution;
 	//Récupération de la position actuelle 
-    try {
-        tfRobot2Map = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
-		pixelPosition[0] = (tfRobot2Map.transform.translation.x - originMap.position.x)/resolution;
-        pixelPosition[1] = msg->info.height - (tfRobot2Map.transform.translation.y - originMap.position.y)/resolution;
-		posture[2] = tfRobot2Map.transform.rotation.z;
-    }catch (tf2::TransformException& ex) {
-        ROS_WARN("%s", ex.what());
-    }
-	ROS_INFO("CommandNode::mapCallback,  Position mesurée [%d, %d, %f]", pixelPosition[0], pixelPosition[1], posture[2]);
+  
+	//ROS_INFO("CommandNode::mapCallback,  Position mesurée [%d, %d, %f]", pixelPosition[0], pixelPosition[1], posture[2]);
 }
 
 void CommandNode::Map2Command(const ros::TimerEvent& event) {
+	//Récupération de la position actuelle
+	//ROS_INFO("CommandNode::Map2Command deb");
+	//ROS_INFO("CommandNode::Map2Command passe try");
+	
+	//posture[2] = - 2* M_PI/3;
+	try {
+		tfRobot2Map = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
+		pixelPosition[0] = (tfRobot2Map.transform.translation.x - originMap.position.x)/resolution;
+		pixelPosition[1] = height - (tfRobot2Map.transform.translation.y - originMap.position.y)/resolution;
+		
+		geometry_msgs::Quaternion& q = tfRobot2Map.transform.rotation;
+		posture[2] = atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y*q.y + q.z*q.z));
+		
+  }catch (tf2::TransformException& ex) {
+		ROS_WARN("%s", ex.what());
+  }
 
 	float nouveauGradient[2] = {0,0};
 	int64_t pXd, pYd;
@@ -56,16 +65,16 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 				pXd = pixelPosition[0] + dx;
 				if (0 <= pXd && pXd < width) {
 					// Trouver le sens
-					nouveauGradient[0] += dx * filtre[dy+delta][dx+delta] * map[pYd*width + pXd];
-					nouveauGradient[1] += dy * filtre[dy+delta][dx+delta] * map[pYd*width + pXd]; 
+					nouveauGradient[0] -= dx * filtre[dy+delta][dx+delta] * map[pYd*width + pXd];
+					nouveauGradient[1] -= dy * filtre[dy+delta][dx+delta] * map[pYd*width + pXd]; 
 				}
 			}
 		}
 	}
-	gradient[0] = coefMomentum * gradient[0] - nouveauGradient[0];
-	gradient[1] = coefMomentum * gradient[1] - nouveauGradient[1];
+	gradient[0] = coefMomentum * gradient[0] + nouveauGradient[0];
+	gradient[1] = coefMomentum * gradient[1] + nouveauGradient[1];
 
-	ROS_INFO("CommandNode::Map2Command() -- grad=(%f, %f)", gradient[0], gradient[1]);
+	// ROS_INFO("CommandNode::Map2Command() -- grad=(%f, %f)", gradient[0], gradient[1]);
 	
 	float norme = sqrt(gradient[0] * gradient[0] + gradient[1] * gradient[1]);
 
@@ -74,15 +83,14 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	// pente de potentiel faible -> vitesse linéaire basse
 	geometry_msgs::Twist msg;
 
-	float diffAngle = posture[2] - atan2(gradient[1], gradient[0]);
-	if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
-	if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
-	msg.angular.z = diffAngle/2;
+	float angleVoulu = - atan2(-gradient[1], gradient[0]);
+	float diffAngle = angleVoulu - posture[2];
 	
-	msg.linear.x = coefCommande * abs(diffAngle)/M_PI * norme;
-
-	ROS_INFO("CommandNode::Map2Command,  nouveauGradient = [%f, %f]", nouveauGradient[0], nouveauGradient[1]);
-	ROS_INFO("CommandNode::Map2Command,  			 cmd = [%f, %f]\n", msg.linear.x, msg.angular.z);
+	if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
+	else if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
+	
+	msg.angular.z = - coefCmdRot * diffAngle;
+	msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
 
 	cmd_vel_pub.publish(msg);
 }
@@ -98,28 +106,10 @@ void CommandNode::getPotMapCallback(const std_msgs::UInt8MultiArray& msg) {
 			ROS_INFO("CommandNode::getMapCallback -> height : %d,  width : %d,  mémoire demandée : %d\n", height, width, height*width);
 		}
 	}
-	for (uint32_t i=0; i<width * height; i++) {
-		map[i] = msg.data[i];
-	}
-	//memcpy(map, &msg.data, (size_t) (width * height));
-
-	printMap(msg, "stcMapRecue", 255);
-
-	std_msgs::UInt8MultiArray copy;
-	copy.layout.dim.resize(2, std_msgs::MultiArrayDimension());
-    copy.layout.dim[0].label = "height";
-    copy.layout.dim[0].size = height;
-    copy.layout.dim[1].label = "width";
-    copy.layout.dim[1].size = width;
-    copy.data.resize(height*width);
-
-	for (uint32_t i=0; i<width * height; i++) {
-		copy.data[i] = map[i];
-	}
-
-	printMap(copy, "stcMapLue", 255);
 	
-	ROS_INFO("CommandNode::getPotMapCallback, height : %d,  width : %d\n", height, width);
+	std::copy(msg.data.begin(), msg.data.end(), map);
+	
+	//ROS_INFO("CommandNode::getPotMapCallback, height : %d,  width : %d\n", height, width);
 }
 
 void CommandNode::printMap(const std_msgs::UInt8MultiArray& carte, std::string nom, uint16_t valMax) {

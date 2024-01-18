@@ -45,7 +45,7 @@ class Joystick_node{
 
 };
 
-  Joystick_node::Joystick_node(): linear_(1), angular_(0), l_scale_(1.0), a_scale_(0.6){
+  Joystick_node::Joystick_node(): linear_(1), angular_(0), l_scale_(.4), a_scale_(0.6){
     ROS_INFO("Creation ROS joystick_node");
 
     n.param("axis_linear", linear_, linear_);

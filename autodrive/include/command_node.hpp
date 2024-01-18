@@ -16,6 +16,7 @@
 // %EndTag(MSG_HEADER)%
 
 #include <tf2_ros/transform_listener.h>
+#include <tf/transform_datatypes.h>
 
 #include <sstream>
 #include <fstream>
@@ -24,7 +25,7 @@
 #include <cstdint>
 #include <cmath>
 
-#define SEND_CMD_HZ 3
+#define SEND_CMD_HZ 10
 
 #define TAILLE_FILTRE 11
 
@@ -66,8 +67,9 @@ private :
 	float posture[3] = {0, 0, 0};
 	float gradient[2] = {0, 0};
 	
-	float coefMomentum = 0.5f;
-	float coefCommande = 0.001f;
+	float coefMomentum = 0.0f;
+	float coefCmdLin = 0.01f;
+	float coefCmdRot = 0.3f;
 
 	void Map2Command(const ros::TimerEvent& event);
 

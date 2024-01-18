@@ -38,11 +38,11 @@ PlannifNode::~PlannifNode() {
 
 	delete[] map_data;
 
-    sub_activation_.shutdown();
-    sub_goal_.shutdown();
-    sub_map_.shutdown();
-    timer.stop();
-    timer2.stop();
+  sub_activation_.shutdown();
+  sub_goal_.shutdown();
+  sub_map_.shutdown();
+  timer.stop();
+  timer2.stop();
 }
 
 void PlannifNode::changeState(const std_msgs::Bool::ConstPtr& stop){
@@ -115,10 +115,12 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
         first_init = false;
     }
 
-    //Copie la map reçu dans les données à traiter
+    //Copie la map reçue dans les données à traiter
     const std::vector<signed char>& data_vector = msg->data;
+    delete[] map_data;
     map_data = new uint8_t[data_vector.size()];
     std::copy(data_vector.begin(), data_vector.end(), map_data);
+    std::fill(initPotential.data.begin(), initPotential.data.end(), 0);
 
     //calculduPotentiel
     calculInitPotential();
@@ -323,7 +325,7 @@ void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
     //Faire l'addition de toutes les maps 
     addPotentialToStatic(initPotential, 1);
     addPotentialToStatic(goalPotential, 1);
-    addPotentialToStatic(tracePotential, 1);
+    //addPotentialToStatic(tracePotential, 1);
 
     //Affichage des maps    
     printMap(initPotential, "initPotential", GOAL_VAL_MAX);
