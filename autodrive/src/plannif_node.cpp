@@ -106,10 +106,10 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
         initMaps(msg->info.width, msg->info.height);
 
         wallDelta = TAILLE_FILTRE_WALL/2;
-        preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_COEFF_A, WALL_COEFF_B, WALL_MULT);
+        preCalculateFilter(wallFilter, wallDelta, TAILLE_FILTRE_WALL, WALL_MULT);
 
         traceDelta = TAILLE_FILTRE_TRACE/2;
-        preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_COEFF_A, TRACE_COEFF_B, TRACE_MULT);
+        preCalculateFilter(traceFilter, traceDelta, TAILLE_FILTRE_TRACE, TRACE_MULT);
         
         timer2 = nh_.createTimer(ros::Duration(1.0f/SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
         first_init = false;
@@ -169,35 +169,27 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
 }
 
 /**
-* @bug Il y a un dépassement de mémoire si taille_filtre est pair.
+* @bug Il y a un dépassement de mémoire si taille_filtre est pair ou si le filtre n'a pas la taille indiquée.
 */
-void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB, float mult){
-	ROS_INFO("PlannifNode::preCalculateFilter(filter, delta=%d, taille_filtre=%d,  coeffA=%f,  coeffB=%f, mult=%f)\n",
-		delta, taille_filtre, coeffA, coeffB, mult
+void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float mult){
+	ROS_INFO("PlannifNode::preCalculateFilter(filter, delta=%d, taille_filtre=%d, mult=%f)\n",
+		delta, taille_filtre, mult
 	);
     float distance_centre = 0;
-    uint16_t indice=0;
 		float somme=0;
+		float sigma = -4 * log(0.01f)/(taille_filtre*taille_filtre);
     printf("\n");
     for(int y=-delta; y<delta+1; y++){
         for(int x=-delta; x<delta+1; x++){
-            distance_centre = sqrt(x*x + y*y);
-            filter_[x+delta + (y+delta)*taille_filtre] = 
-            //filter_[indice] =
-                coeffA * exp(-coeffB*distance_centre*distance_centre);
+            distance_centre = abs(x*x + y*y); // distance carrée
+            filter_[x+delta + (y+delta)*taille_filtre] = exp(-sigma*distance_centre);
             somme += filter_[x+delta + (y+delta)*taille_filtre];
-            indice++;
         }
     }
-    float rapport = mult * (float)GOAL_VAL_MAX / OCCUPANCYGRID_VAL_MAX;
-    ROS_INFO("double boucle passee, somme=%f,   filtre multiplie par %f", somme, rapport/somme);
-    for(int y=-delta; y<delta+1; y++){
-    	for(int x=-delta; x<delta+1; x++){
-		  	filter_[x+delta + (y+delta)*taille_filtre] *= rapport / somme;
-        printf("%f\t", filter_[x+delta + (y+delta)*taille_filtre]);
-    	}
-      printf("\n");
-    }
+    float rapport = (float)(mult * GOAL_VAL_MAX) / (OCCUPANCYGRID_VAL_MAX * somme);
+		for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
+				filter_[i] *= rapport;
+		}
 }
 
 /**
@@ -209,34 +201,63 @@ void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* fi
 	// );
     uint16_t i = 0;
     int ligne = 0;
-    for(int y=-delta; y<delta+1; y++){
+    for(int16_t y=-delta; y<delta+1; y++){
         ligne = y*(mapPotential->layout.dim[1].size);
-        for(int x=-delta; x<delta+1; x++){
+        for(int16_t x=-delta; x<delta+1; x++){
             mapPotential->data[indice + x + ligne] += filter_[i] * coef;
             i++;
         }
     }
 }
 
-void PlannifNode::calculInitPotential(){
-	// ROS_INFO("PlannifNode::calculInitPotential(), wallDelta=%d\n", wallDelta);
-    int indice;
-    for(uint32_t y=wallDelta; y<(initPotential.layout.dim[0].size-wallDelta); y++){
-        for(uint32_t x=wallDelta; x<(initPotential.layout.dim[1].size-wallDelta); x++){
-            indice = x + (y*initPotential.layout.dim[1].size);
-
-            if(map_data[indice] < 101){
-                //faire le filtre
-                applyFilter(&initPotential, wallFilter,
-                //  wallDelta, map_data[indice]);
-x + ((initPotential.layout.dim[0].size-y-wallDelta-1)*initPotential.layout.dim[1].size),
-                wallDelta, map_data[indice]);
-            }
-            else {
-            	initPotential.data[indice] = 0;
-            }
+/**
+* Presque pareil que applyFilter mais de map_data vers initPotential
+*/
+void PlannifNode::applyConvolution(uint8_t* mapData, uint16_t width, float* filter_, uint64_t indice, uint8_t delta, uint8_t& ptToChange){
+	//ROS_INFO("PlannifNode::applyConvolution(mapData = %p, width = %d, filter_ = %p, indice=%ld,  delta=%d,  ptToChange=%d)\n",
+	//	mapData, width, filter_, indice, delta, ptToChange
+	//);
+    uint16_t i = 0;
+    int ligne = 0;
+    float temp = 0;
+    for(int16_t y=-delta; y<delta+1; y++){
+        ligne = y*width;
+        for(int16_t x=-delta; x<delta+1; x++){
+            temp += mapData[indice + x + ligne] * filter_[i];
+            i++;
         }
     }
+    
+    if (temp < 0) temp = 0;
+    else if (temp > GOAL_VAL_MAX) temp = GOAL_VAL_MAX;
+    
+    ptToChange = (uint8_t)round(temp);
+}
+
+
+void PlannifNode::calculInitPotential(){
+	ROS_INFO("PlannifNode::calculInitPotential(), wallDelta=%d\n", wallDelta);
+	
+	uint32_t h = initPotential.layout.dim[0].size;
+	uint32_t w = initPotential.layout.dim[1].size;
+	
+  uint64_t indice;
+  for (indice=0; indice < h*w; indice++) {
+  	if (map_data[indice] > 101) { // La zone est inconnue
+  		map_data[indice] = 0;
+  	}
+  }
+
+	for(uint32_t y=wallDelta; y<(h-wallDelta); y++){
+		for(uint32_t x=wallDelta; x<(w-wallDelta); x++){
+			indice = x + y*w;
+			//ROS_INFO("map = %ld\t", indice, x + (h-y-1)*w);
+			//faire le filtre
+			applyConvolution(map_data, w, wallFilter,
+			x + (h-y-1)*w,
+			wallDelta, initPotential.data[indice]);
+		}
+	}
 }
 
 void PlannifNode::calculGoalPotential(){

@@ -16,12 +16,14 @@
 #include <fstream>
 #include <iostream>
 
+#include <cmath>
+
 //Hyperparamétres Filtres
 #define TRACE_COEFF_A 1
 #define WALL_COEFF_A 1
 
 #define TAILLE_FILTRE_WALL 23 // PAS DE FILTRE DE TAILLE PAIRE !!
-#define TAILLE_FILTRE_TRACE 19 
+#define TAILLE_FILTRE_TRACE 19
 
 #define WALL_MULT 15
 #define TRACE_MULT 200
@@ -91,8 +93,9 @@ class PlannifNode {
         void calculTracePotential(const ros::TimerEvent& event);
         void sendStaticPotential(const ros::TimerEvent& event);
 
-        void preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float coeffA, float coeffB, float mult);
+        void preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float mult);
         void applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, int coef);
+        void applyConvolution(uint8_t* mapData, uint16_t width, float* filter_, uint64_t indice, uint8_t delta, uint8_t& ptToChange);
         
         void addPotentialToStatic(std_msgs::UInt8MultiArray& mapPotential, int coeff);
         void printMap(std_msgs::UInt8MultiArray& map, std::string nom, uint16_t valMax);

@@ -82,16 +82,22 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	// on veut beaucoup tourner -> vitesse linéaire basse
 	// pente de potentiel faible -> vitesse linéaire basse
 	geometry_msgs::Twist msg;
-
-	float angleVoulu = - atan2(-gradient[1], gradient[0]);
-	float diffAngle = angleVoulu - posture[2];
 	
-	if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
-	else if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
+	if (norme < 0.01f) {
+		msg.angular.z = 0.5f;
+		msg.linear.x = 0.f;
+	}
+	else {
+		float angleVoulu = - atan2(-gradient[1], gradient[0]);
+		float diffAngle = angleVoulu - posture[2];
+		
+		if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
+		else if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
+		
+		msg.angular.z = - coefCmdRot * diffAngle;
+		msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
+	}
 	
-	msg.angular.z = - coefCmdRot * diffAngle;
-	msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
-
 	cmd_vel_pub.publish(msg);
 }
 
