@@ -13,6 +13,7 @@
 #include "geometry_msgs/Twist.h"
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/TransformStamped.h>
+#include <std_msgs/Bool.h>
 // %EndTag(MSG_HEADER)%
 
 #include <tf2_ros/transform_listener.h>
@@ -40,16 +41,18 @@ private :
 	ros::NodeHandle nh_;
 	// Publisher to :
 	// cmd_vel [nav_msgs::OccupancyGrid::ConstPtr]
-	ros::Publisher cmd_vel_pub;
+	ros::Publisher pub_cmd_vel_;
 
 	ros::Subscriber sub_map_;
 	
 	// Suscriber to :
 	// stat_pot [std_msgs::UInt8MultiArray]
-	ros::Subscriber pot_map_sub;
+	ros::Subscriber sub_pot_map_;
+	ros::Subscriber sub_activation_;
 
 	// Timer
 	ros::Timer timer;
+	ros::Timer timer_start;
 
 	tf2_ros::Buffer tfBuffer;
 	tf2_ros::TransformListener tfListener;
@@ -71,8 +74,14 @@ private :
 	float coefCmdLin = 0.01f;
 	float coefCmdRot = 0.3f;
 
-	void Map2Command(const ros::TimerEvent& event);
+	bool first_init = true;
+	bool stop_ = false;
 
+	void checkMapInit(const ros::TimerEvent& event);
+	void Map2Command(const ros::TimerEvent& event);
+	void getRobotPos();
+
+	void changeState(const std_msgs::Bool::ConstPtr& stop);
 	void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 	void getPotMapCallback(const std_msgs::UInt8MultiArray& msg); // http://docs.ros.org/en/api/nav_msgs/html/msg/OccupancyGrid.html
 

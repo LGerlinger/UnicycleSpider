@@ -6,9 +6,9 @@
 #include <tf2_ros/transform_listener.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <std_msgs/Bool.h>
+#include "geometry_msgs/Pose.h"
+#include "nav_msgs/OccupancyGrid.h"
 // #include "geometry_msgs/Twist.h"
-// #include "geometry_msgs/Pose.h"
-// #include "nav_msgs/OccupancyGrid.h"
 
 
 #include <sstream>
@@ -38,7 +38,7 @@ class ManagerNode {
         geometry_msgs::PoseStamped my_goal;
         double goal_point[2] =  {1000.0, 1000.0};;
         float actualPosition[2] = {0.0, 0.0};
-
+        bool goalAchieved = true;
 
         void goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
         void getPosRobot(const ros::TimerEvent& event);
