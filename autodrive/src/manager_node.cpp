@@ -34,7 +34,7 @@ void ManagerNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
     //Ajouter Delay ?
 
 
-    ROS_INFO("MANAGER : Publish nouveau goal");
+    //ROS_INFO("MANAGER : Publish nouveau goal");
     pub_my_goal_.publish(my_goal);
     goalAchieved = false;
 }
@@ -55,15 +55,15 @@ void ManagerNode::getPosRobot(const ros::TimerEvent& event){
             ROS_WARN("%s", ex.what());
         }
         
-        ROS_INFO("MANAGER : X_robot %f et X_goal %f", actualPosition[0], goal_point[0]);
-        ROS_INFO("MANAGER : Y_robot %f et Y_goal %f", actualPosition[1], goal_point[1]);
+        //ROS_INFO("MANAGER : X_robot %f et X_goal %f", actualPosition[0], goal_point[0]);
+        //ROS_INFO("MANAGER : Y_robot %f et Y_goal %f", actualPosition[1], goal_point[1]);
 
         //Faire test si le goal est proche du goal
         distance_goal = sqrt(pow(actualPosition[0] - goal_point[0], 2) 
                             + pow(actualPosition[1] - goal_point[1], 2));
 
 
-        ROS_INFO("MANAGER : DISTANCE GOAL %f\n\n", distance_goal);
+        //ROS_INFO("MANAGER : DISTANCE GOAL %f\n\n", distance_goal);
         //Stop les autres nodes si on est suffisament proche du goal
         if(distance_goal < THRESHOLD_DISTANCE_GOAL){
             goalAchieved = true;

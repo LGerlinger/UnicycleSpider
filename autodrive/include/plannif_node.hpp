@@ -22,7 +22,7 @@
 #define TRACE_COEFF_A 1
 #define WALL_COEFF_A 1
 
-#define TAILLE_FILTRE_WALL 23 // PAS DE FILTRE DE TAILLE PAIRE !!
+#define TAILLE_FILTRE_WALL 41 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
 #define TAILLE_FILTRE_TRACE 19
 
 #define WALL_MULT 15
@@ -53,9 +53,7 @@ class PlannifNode {
         ros::Subscriber sub_activation_;
         ros::Subscriber sub_map_;
         ros::Subscriber sub_goal_;
-        ros::Timer timer;
-        ros::Timer timer2;
-        ros::Timer timer_goal;
+        ros::Timer send_static_timer;
         
         tf2_ros::Buffer tfBuffer;
         tf2_ros::TransformListener tfListener;
@@ -67,7 +65,7 @@ class PlannifNode {
 
         bool first_init = true;
 
-        double goal_point[2];
+        double goal_point[2] = {INFINITY, INFINITY};
 
         geometry_msgs::TransformStamped tfRobot2Map;
         geometry_msgs::Pose originMap;
@@ -85,6 +83,7 @@ class PlannifNode {
         
         void changeState(const std_msgs::Bool::ConstPtr& stop);
         void goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+        void goalOffset();
         void checkMapInit4Goal(const ros::TimerEvent& event);
         void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
         void initMaps(uint32_t width_, uint32_t height_);
