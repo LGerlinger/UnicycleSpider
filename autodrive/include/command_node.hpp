@@ -61,7 +61,7 @@ private :
 	float resolution = 1;
 	uint32_t pixelPosition[2] = {0, 0};
 	
-	uint8_t* map;
+	uint8_t* map = nullptr;
 	uint32_t width;
 	uint32_t height;
 	
@@ -72,7 +72,7 @@ private :
 	
 	float coefMomentum = 0.0f;
 	float coefCmdLin = 0.01f;
-	float coefCmdRot = 0.3f;
+	float coefCmdRot = 0.8f;
 
 	bool first_init = true;
 	bool stop_ = false;
@@ -84,8 +84,7 @@ private :
 	void changeState(const std_msgs::Bool::ConstPtr& stop);
 	void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 	void getPotMapCallback(const std_msgs::UInt8MultiArray& msg); // http://docs.ros.org/en/api/nav_msgs/html/msg/OccupancyGrid.html
-
-	void printMap(const std_msgs::UInt8MultiArray& carte, std::string nom, uint16_t valMax);
+	void printMap(const uint8_t* carte, std::string nom, uint16_t valMax);
 };
 
 

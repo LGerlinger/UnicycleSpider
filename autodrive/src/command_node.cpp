@@ -25,7 +25,7 @@ CommandNode::CommandNode(): tfBuffer(), tfListener(tfBuffer) {
 }
 
 CommandNode::~CommandNode() {
-	if (map != NULL) free(map);
+	delete[] map;
 }
 
 //NOTE POUR PLANNIF NODE : FAIRE ATTENTION AUX TIMER LANCEE ALORS QUE LE STOP EST ACTIF !!!
@@ -33,15 +33,21 @@ void CommandNode::changeState(const std_msgs::Bool::ConstPtr& stop){
 	stop_ = stop->data;
 	if(stop_){
 		ROS_INFO("COMMANDE : STOP TOUT");
+		//Arret du robot
 		geometry_msgs::Twist msg;
 		msg.angular.z = 0;
 		msg.linear.x = 0;
 		pub_cmd_vel_.publish(msg);
+
+		gradient[0] = 0;
+		gradient[1] = 0;
+
 		if(!first_init){
 			timer.stop();
 			first_init = true;
 		}
     }else if(first_init){
+		ROS_INFO("COMMANDE : RELANCE");
 		timer_start = nh_.createTimer(ros::Duration(0.5f), &CommandNode::checkMapInit, this);
 	}
 }
@@ -68,17 +74,17 @@ void CommandNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg){
 
 void CommandNode::getPotMapCallback(const std_msgs::UInt8MultiArray& msg) {
 	if (height != msg.layout.dim[0].size || width != msg.layout.dim[1].size) {
-		// free(map);
+		delete[] map;
 		height = msg.layout.dim[0].size;
 		width = msg.layout.dim[1].size;
-		map = (uint8_t*)malloc((size_t) (width * height));
+		map = new uint8_t[width * height];
 		if (map == NULL) {
-			ROS_INFO("CommandNode::getMapCallback -> échec de l'allocation mémoire\n");
-			ROS_INFO("CommandNode::getMapCallback -> height : %d,  width : %d,  mémoire demandée : %d\n", height, width, height*width);
+			ROS_INFO("CommandNode::getPotMapCallback -> échec de l'allocation mémoire\n");
+			ROS_INFO("CommandNode::getPotMapCallback -> height : %d,  width : %d,  mémoire demandée : %d\n", height, width, height*width);
 		}
 	}
 	std::copy(msg.data.begin(), msg.data.end(), map);
-	
+	// printMap(map, "mapRecu", 255);
 	//ROS_INFO("CommandNode::getPotMapCallback, height : %d,  width : %d\n", height, width);
 }
 
@@ -122,30 +128,51 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	// on veut beaucoup tourner -> vitesse linéaire basse
 	// pente de potentiel faible -> vitesse linéaire basse
 	geometry_msgs::Twist msg;
-	
 	if (norme < 0.01f) {
 		msg.angular.z = 0.5f;
 		msg.linear.x = 0.f;
 	}
 	else {
-		float angleVoulu = - atan2(-gradient[1], gradient[0]);
+		float angleVoulu = - atan2(gradient[1], gradient[0]);
 		float diffAngle = angleVoulu - posture[2];
 		
 		if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
 		else if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
 		
-		msg.angular.z = - coefCmdRot * diffAngle;
-		msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
+		msg.angular.z = coefCmdRot * diffAngle;
+		
+		// ROS_INFO("COMMANDE : Angles : post %f, diff %f ", posture[2], diffAngle);
+		// Seuils
+		if (abs(diffAngle) > M_PI/2) {
+			msg.linear.x = 0;
+		} else {
+			msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
+			if (msg.linear.x > 2) {
+				msg.linear.x = 2.0f;
+			}
+		}
+
+		if (abs(msg.angular.z) < 0.18f) {
+			if (msg.angular.z < 0) {
+				msg.angular.z = -0.18f;
+			} else {
+				msg.angular.z = 0.18f;
+			}
+		}
+
+		if (abs(diffAngle) < 0.07f) {
+			msg.angular.z = 0;
+		}
 	}
-	
+
 	pub_cmd_vel_.publish(msg);
 }
 
 void CommandNode::getRobotPos(){
 	try {
-		tfRobot2Map = tfBuffer.lookupTransform("base_link", "map", ros::Time(0));
+		tfRobot2Map = tfBuffer.lookupTransform("map", "base_link", ros::Time(0));
 		pixelPosition[0] = (tfRobot2Map.transform.translation.x - originMap.position.x)/resolution;
-		pixelPosition[1] = height - (tfRobot2Map.transform.translation.y - originMap.position.y)/resolution;
+		pixelPosition[1] = height-1 -  (tfRobot2Map.transform.translation.y - originMap.position.y)/resolution;
 		
 		geometry_msgs::Quaternion& q = tfRobot2Map.transform.rotation;
 		posture[2] = atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y*q.y + q.z*q.z));
@@ -155,10 +182,11 @@ void CommandNode::getRobotPos(){
 	}
 }
 
+
 /**
  * @brief Enregistrement d'une map
 */
-void CommandNode::printMap(const std_msgs::UInt8MultiArray& carte, std::string nom, uint16_t valMax) {
+void CommandNode::printMap(const uint8_t* carte, std::string nom, uint16_t valMax) {
 	// ROS_INFO("PlannifNode::printMap(map, nom)\n");
 	// Ouverture du fichier
 	std::ofstream wf("/home/catkin_ws/src/autodrive/mapdump/" + nom + ".pgm", std::ios::out | std::ios::binary | std::ios::trunc);
@@ -171,9 +199,7 @@ void CommandNode::printMap(const std_msgs::UInt8MultiArray& carte, std::string n
 	char metaData[128] = "P5\n";
 	
 	size_t metaDataSize = 3;
-
-	uint32_t width = carte.layout.dim[1].size;
-	uint32_t height = carte.layout.dim[0].size;
+	
 	if (width && height) {
 		char tampon[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 		uint8_t tamponSize = 0;
@@ -216,12 +242,10 @@ void CommandNode::printMap(const std_msgs::UInt8MultiArray& carte, std::string n
 		wf.write((char*)metaData, metaDataSize);
 		
 		// Impression de la carte dans le fichier
-		wf.write((char*)carte.data.data(), (size_t)(width*height));
+		wf.write((char*)carte, (size_t)(width*height));
 	}
 	// ROS_INFO("PlannifNode::printMap ~%d ko ecrits dans /home/catkin_ws/src/autodrive/mapdump/", width*height/1000);
 }
-
-
 
 int main(int argc, char **argv)
 {

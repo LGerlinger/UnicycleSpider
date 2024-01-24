@@ -22,13 +22,15 @@
 #define TRACE_COEFF_A 1
 #define WALL_COEFF_A 1
 
-#define TAILLE_FILTRE_WALL 41 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
-#define TAILLE_FILTRE_TRACE 19
-
-#define WALL_MULT 15
-#define TRACE_MULT 200
-
+#define TAILLE_FILTRE_WALL 29 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
+#define WALL_MULT 10
 #define WALL_COEFF_B 0.01
+
+
+#define CALCUL_TRACE_MAP_HZ 5.0
+#define TAILLE_MAX_TRACE 10
+#define TAILLE_FILTRE_TRACE 31
+#define TRACE_MULT 400
 #define TRACE_COEFF_B 0.09
 
 //Autres 
@@ -36,8 +38,6 @@
 #define GOAL_VAL_MIN 0
 #define OCCUPANCYGRID_VAL_MAX 100
 
-#define TAILLE_MAX_TRACE 10
-#define CALCUL_TRACE_MAP_HZ 1.0
 #define SEND_MAP_HZ 1.5
 
 
@@ -53,6 +53,8 @@ class PlannifNode {
         ros::Subscriber sub_activation_;
         ros::Subscriber sub_map_;
         ros::Subscriber sub_goal_;
+
+        ros::Timer trace_calcul_timer;
         ros::Timer send_static_timer;
         
         tf2_ros::Buffer tfBuffer;
@@ -65,6 +67,7 @@ class PlannifNode {
 
         bool first_init = true;
 
+        double og_goal_point[2] = {INFINITY, INFINITY};
         double goal_point[2] = {INFINITY, INFINITY};
 
         geometry_msgs::TransformStamped tfRobot2Map;
@@ -78,6 +81,7 @@ class PlannifNode {
         uint8_t wallDelta = 0;
         uint8_t traceDelta = 0;
 
+        std::vector<std::array<float, 2>> pastPositionBrut;
         std::vector<std::array<float, 2>> pastPosition;
         float actualPosition[2] = {0.0, 0.0};
         
