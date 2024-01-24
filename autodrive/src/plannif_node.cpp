@@ -1,9 +1,6 @@
 #include "../include/plannif_node.hpp"
 
 
-// Chercher les print de debuggage du memory leak : 
-// MEMORY LEAK DEBUGGING
-
 PlannifNode::PlannifNode() : tfBuffer(), tfListener(tfBuffer){
 	ROS_INFO("PlannifNode::PlannifNode()\n");
 
@@ -155,18 +152,15 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
     || staticPotential.layout.dim[0].size != msg->info.height
     || staticPotential.layout.dim[1].size != msg->info.width){
         //Initialise toutes les données
-        ROS_INFO("PLANNIF : mapCallback first init ou changement de taille de gmap");
+        ROS_INFO("PLANNIF : mapCallback first init ou changement de taille de gmap. taille = [%d, %d]", msg->info.width, msg->info.height);
         //Récupére l'origine de la map (en m)
         originMap = msg->info.origin;
         resolution = msg->info.resolution;
 
         initMaps(msg->info.width, msg->info.height);
 
-        if (!isinf(goal_point[0])) { // Si on a recu l'objectif à l'avance
-            ROS_INFO("goal est bien INFINITY");
-            goalOffset();
-            calculGoalPotential();
-        }
+        goalOffset();
+        calculGoalPotential();
         
         send_static_timer = nh_.createTimer(ros::Duration(1.0f/SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
         first_init = false;
@@ -177,8 +171,6 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
     delete[] map_data;
     map_data = new uint8_t[data_vector.size()];
     std::copy(data_vector.begin(), data_vector.end(), map_data);
-    ROS_INFO("map_data cree taille : %ld.  on lui passe %ld", data_vector.end() - data_vector.begin(), data_vector.size());
-    ROS_INFO("PlannifNode::mapCallback taille nouvelle gmap : [%d, %d]", msg->info.width, msg->info.height);
     //calculduPotentiel
     calculInitPotential();
 }
@@ -198,37 +190,28 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     initPotential.layout.dim[0].size = height_;
     initPotential.layout.dim[1].size = width_;
     //initPotential.data.clear();
-    ROS_INFO("initPotential.data : size = %ld", initPotential.data.size());
-    ROS_INFO("resize va crasher pour totalSize=%ld", totalSize);
     initPotential.data.resize(totalSize);
-    ROS_INFO("2");
     std::fill(initPotential.data.begin(), initPotential.data.end(), 0);
-    ROS_INFO("initPotential");
     
     //goalPotential
     goalPotential.layout.dim[0].size = height_;
     goalPotential.layout.dim[1].size = width_;
     //goalPotential.data.clear();
     goalPotential.data.resize(totalSize);
-    ROS_INFO("goalPotential");
 
     //tracePotential
     tracePotential.layout.dim[0].size = height_;
     tracePotential.layout.dim[1].size = width_;
     //tracePotential.data.clear();
     tracePotential.data.resize(totalSize);
-    std::fill(tracePotential.data.begin(), initPotential.data.end(), 0);
-    ROS_INFO("tracePotential");
+    std::fill(tracePotential.data.begin(), tracePotential.data.end(), 0);
 
     //staticPotential
     staticPotential.layout.dim[0].size = height_;
     staticPotential.layout.dim[1].size = width_;
     //staticPotential.data.clear();
     staticPotential.data.resize(totalSize);
-    std::fill(staticPotential.data.begin(), initPotential.data.end(), 0);
-    ROS_INFO("staticPotential");
-    
-    ROS_INFO("PlannifNode::initMaps end");
+    std::fill(staticPotential.data.begin(), staticPotential.data.end(), 0);
 }
 
 /**
@@ -244,11 +227,6 @@ void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_f
     printf("\n");
     for(int y=-delta; y<delta+1; y++){
         for(int x=-delta; x<delta+1; x++){
-            // MEMORY LEAK DEBUGGING
-            if (x+delta + (y+delta)*taille_filtre < 0 || taille_filtre*taille_filtre <= x+delta + (y+delta)*taille_filtre) {
-                ROS_INFO("PlannifNode::preCalculateFilter, MEMORY LEAK!! : %d", x+delta + (y+delta)*taille_filtre );
-            }
-            // END MEMORY LEAK DEBUGGING
 
             distance_centre = abs(x*x + y*y); // distance carrée
             filter_[x+delta + (y+delta)*taille_filtre] = exp(-sigma*distance_centre);
@@ -257,11 +235,6 @@ void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_f
     }
     float rapport = (float)(mult * GOAL_VAL_MAX) / (OCCUPANCYGRID_VAL_MAX * somme);
 		for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
-            // MEMORY LEAK DEBUGGING
-            if (i < 0 || taille_filtre*taille_filtre <= i) {
-                ROS_INFO("PlannifNode::preCalculateFilter 2, MEMORY LEAK!! : %d", i );
-            }
-            // END MEMORY LEAK DEBUGGING
 				filter_[i] *= rapport;
 		}
 }
@@ -278,16 +251,6 @@ void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* fi
     for(int16_t y=-delta; y<delta+1; y++){
         ligne = y*(mapPotential->layout.dim[1].size);
         for(int16_t x=-delta; x<delta+1; x++){
-            // MEMORY LEAK DEBUGGING
-            if (indice + x + ligne < 0 || mapPotential->layout.dim[0].size * mapPotential->layout.dim[1].size <= indice + x + ligne) {
-                ROS_INFO("PlannifNode::applyFilter, MEMORY LEAK!! : %d", indice + x + ligne);
-            }
-            // END MEMORY LEAK DEBUGGING
-            // MEMORY LEAK DEBUGGING
-            if (i < 0 || (2*delta+1) * (2*delta+1) <= i) {
-                ROS_INFO("PlannifNode::applyFilter 2, MEMORY LEAK!! : %d", i);
-            }
-            // END MEMORY LEAK DEBUGGING
             mapPotential->data[indice + x + ligne] += filter_[i] * coef;
             i++;
         }
@@ -307,16 +270,6 @@ void PlannifNode::applyConvolution(uint8_t* mapData, uint16_t width, float* filt
     for(int16_t y=-delta; y<delta+1; y++){
         ligne = y*width;
         for(int16_t x=-delta; x<delta+1; x++){
-            // MEMORY LEAK DEBUGGING
-            if (indice + x + ligne < 0 || initPotential.layout.dim[0].size * initPotential.layout.dim[1].size <= indice + x + ligne) {
-                ROS_INFO("PlannifNode::applyConvolution, MEMORY LEAK!! : %d", i);
-            }
-            // END MEMORY LEAK DEBUGGING
-            // MEMORY LEAK DEBUGGING
-            if (i < 0 || (2*delta+1) * (2*delta+1) <= i) {
-                ROS_INFO("PlannifNode::applyConvolution 2, MEMORY LEAK!! : %d", i);
-            }
-            // END MEMORY LEAK DEBUGGING
             temp += mapData[indice + x + ligne] * filter_[i];
             i++;
         }
@@ -325,7 +278,7 @@ void PlannifNode::applyConvolution(uint8_t* mapData, uint16_t width, float* filt
     if (temp < 0) temp = 0;
     else if (temp > GOAL_VAL_MAX) temp = GOAL_VAL_MAX;
     
-    //ptToChange = (uint8_t)round(temp);
+    ptToChange = (uint8_t)round(temp);
 }
 
 
@@ -345,7 +298,6 @@ void PlannifNode::calculInitPotential(){
 	for(uint32_t y=wallDelta; y<(h-wallDelta); y++){
 		for(uint32_t x=wallDelta; x<(w-wallDelta); x++){
 			indice = x + y*w;
-			//ROS_INFO("map = %ld\t", indice, x + (h-y-1)*w);
 			//faire le filtre
 			applyConvolution(map_data, w, wallFilter,
 			x + (h-y-1)*w,

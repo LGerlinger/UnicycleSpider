@@ -49,8 +49,8 @@ void ManagerNode::getPosRobot(const ros::TimerEvent& event){
             
             actualPosition[0] = tfRobot2Map.transform.translation.x; //- originMap.position.x;
             actualPosition[1] = tfRobot2Map.transform.translation.y; //- originMap.position.y;
-            std::cout << "Frame ID ROBOT : " << tfRobot2Map.header.frame_id << std::endl;
-            std::cout << "childFrame ID  ROBOT : " << tfRobot2Map.child_frame_id << std::endl;
+            // std::cout << "Frame ID ROBOT : " << tfRobot2Map.header.frame_id << std::endl;
+            // std::cout << "childFrame ID  ROBOT : " << tfRobot2Map.child_frame_id << std::endl;
         }catch (tf2::TransformException& ex) {
             ROS_WARN("%s", ex.what());
         }
