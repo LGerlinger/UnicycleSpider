@@ -71,7 +71,7 @@ private :
 	float gradient[2] = {0, 0};
 	
 	float coefMomentum = 0.f;
-	float coefCmdLin = 0.01f;
+	float coefCmdLin = 0.5f;
 	float coefCmdRot = 0.8f;
 
 	bool first_init = true;

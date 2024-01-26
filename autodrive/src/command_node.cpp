@@ -146,7 +146,7 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 		if (abs(diffAngle) > 2*M_PI/3) {
 			msg.linear.x = 0;
 		} else {
-			msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI * norme;
+			msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI;
 			if (msg.linear.x > 2) {
 				msg.linear.x = 2.0f;
 			}
