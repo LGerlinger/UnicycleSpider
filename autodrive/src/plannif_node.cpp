@@ -90,6 +90,10 @@ void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
     og_goal_point[0] = msg->pose.position.x;
     og_goal_point[1] = msg->pose.position.y;
     
+    pastPositionBrut.resize(0);
+    pastPosition.resize(0);
+    std::fill(tracePotential.data.begin(), tracePotential.data.end(), 0);
+    
     if (!first_init) { // On a la carte donc l'origine de la carte
         goalOffset();
         //Recalcul map 
@@ -108,11 +112,23 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
 	// 	msg->info.width,
 	// 	msg->info.height
 	// );
+    
+    //Lors de la premiére initialisation
     if(first_init){
+        originMap = msg->info.origin;
+        resolution = msg->info.resolution;
+        initMaps(msg->info.width, msg->info.height);
+
+        //Recalcul du goal
+        goalOffset();
+        calculGoalPotential();
+        
         trace_calcul_timer = nh_.createTimer(ros::Duration(1.0f/CALCUL_TRACE_MAP_HZ), &PlannifNode::calculTracePotential, this);
         send_static_timer = nh_.createTimer(ros::Duration(1.0f/SEND_MAP_HZ), &PlannifNode::sendStaticPotential, this);
         first_init = false;
     }
+
+    //Si la taille de la map change
     if(staticPotential.layout.dim[0].size != msg->info.height
     || staticPotential.layout.dim[1].size != msg->info.width){
         //Initialise toutes les données
@@ -120,17 +136,34 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
         //Récupére l'origine de la map (en m)
         originMap = msg->info.origin;
         resolution = msg->info.resolution;
-
         initMaps(msg->info.width, msg->info.height);
 
         goalOffset();
         calculGoalPotential();
         
-        
+        //Calcul des nouvelles positions précédentes
         for(uint16_t i=0; i < pastPosition.size(); i++){
             pastPosition[i][0] = (pastPositionBrut[i][0] - originMap.position.x)/resolution;
             pastPosition[i][1] = goalPotential.layout.dim[0].size -1 - (pastPositionBrut[i][1] - originMap.position.y)/resolution;
         }
+
+        //Réécriture de la trace
+        std::fill(tracePotential.data.begin(), tracePotential.data.end(), 0);
+        int indice=0;
+        for(uint16_t y=0; y<TRACE_DECAY; y++){
+            for(uint16_t i=y; i<pastPosition.size()-1-y; i++){
+                indice = round(pastPosition[i][0]) + round(pastPosition[i][1])*tracePotential.layout.dim[1].size;
+                applyFilter(&tracePotential, traceFilter, indice, traceDelta, 1);
+            }
+        
+        }
+        // for(uint16_t j=0; j<TRACE_DECAY-1; j++){
+        //     for(uint16_t i=0; i<TRACE_DECAY-j; i++){
+        //         indice = round(pastPosition[i][0]) + round(pastPosition[i][1])*tracePotential.layout.dim[1].size;
+        //         applyFilter(&tracePotential, traceFilter, indice, traceDelta, -1);
+        //     }
+        // }
+
     }
 
     //Copie la map reçue dans les données à traiter
@@ -140,6 +173,7 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
     std::copy(data_vector.begin(), data_vector.end(), map_data);
     //calculduPotentiel
     calculInitPotential();
+
 }
 
 /**
@@ -156,27 +190,23 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     //InitPotential
     initPotential.layout.dim[0].size = height_;
     initPotential.layout.dim[1].size = width_;
-    //initPotential.data.clear();
     initPotential.data.resize(totalSize);
     std::fill(initPotential.data.begin(), initPotential.data.end(), 0);
     
     //goalPotential
     goalPotential.layout.dim[0].size = height_;
     goalPotential.layout.dim[1].size = width_;
-    //goalPotential.data.clear();
     goalPotential.data.resize(totalSize);
 
     //tracePotential
     tracePotential.layout.dim[0].size = height_;
     tracePotential.layout.dim[1].size = width_;
-    //tracePotential.data.clear();
     tracePotential.data.resize(totalSize);
     std::fill(tracePotential.data.begin(), tracePotential.data.end(), 0);
 
     //staticPotential
     staticPotential.layout.dim[0].size = height_;
     staticPotential.layout.dim[1].size = width_;
-    //staticPotential.data.clear();
     staticPotential.data.resize(totalSize);
     std::fill(staticPotential.data.begin(), staticPotential.data.end(), 0);
 }
@@ -209,7 +239,7 @@ void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_f
 /**
 * @param coef : valeur du pixel indice de l'image à copier/filtrer
 */
-void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, int coef){
+void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* filter_, int indice, uint8_t delta, float coef){
 	// ROS_INFO("PlannifNode::applyFilter(mapPotential = %p, filter_, indice=%d,  delta=%d)\n",
 	// 	mapPotential, indice, delta
 	// );
@@ -218,7 +248,7 @@ void PlannifNode::applyFilter(std_msgs::UInt8MultiArray* mapPotential, float* fi
     for(int16_t y=-delta; y<delta+1; y++){
         ligne = y*(mapPotential->layout.dim[1].size);
         for(int16_t x=-delta; x<delta+1; x++){
-            mapPotential->data[indice + x + ligne] += filter_[i] * coef;
+            mapPotential->data[indice + x + ligne] += (uint8_t)(filter_[i] * coef);
             i++;
         }
     }
@@ -340,22 +370,13 @@ void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
     }
     pastPositionBrut.push_back({actualPosition[0], actualPosition[1]});
 
+    //Trace potential
+    applyTracePotential();    
+
     actualPosition[0] = (actualPosition[0] - originMap.position.x)/resolution;
     actualPosition[1] = goalPotential.layout.dim[0].size -1 - (actualPosition[1] - originMap.position.y)/resolution;
 
-    //tracePotential
-    for(uint16_t i=0; i<pastPosition.size(); i++){
-        indice = pastPosition[i][0] + (pastPosition[i][1]*tracePotential.layout.dim[1].size);
-        if(i == pastPosition.size()-1){
-            //Si c'est le point le plus récent
-            applyFilter(&tracePotential, traceFilter, indice, traceDelta, 1);
-        }else{
-            //Sinon on le diminue
-            applyFilter(&tracePotential, traceFilter, indice, traceDelta, -1/(TAILLE_MAX_TRACE-1));
-        }
-    }
-
-    //Met à jour le vecteur pastPositionBrut
+    //Met à jour le vecteur pastPosition
     if(pastPosition.size()==TAILLE_MAX_TRACE){
         pastPosition.erase(pastPosition.begin());
     }
@@ -363,6 +384,30 @@ void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
     
     printMap(tracePotential, "tracePotential", GOAL_VAL_MAX/2);
 }   
+
+void PlannifNode::applyTracePotential(){
+    //tracePotential
+    // ROS_INFO("Plannif::applyTracePotential");
+    int indice=0;
+    if(pastPosition.size()>(TRACE_DECAY*2)+TRACE_DELAY){
+        for(uint16_t i=pastPosition.size()-TRACE_DELAY-1; i>pastPosition.size()-TRACE_DECAY-TRACE_DELAY-1; i--){
+            indice = round(pastPosition[i][0]) + round(pastPosition[i][1])*tracePotential.layout.dim[1].size;
+            applyFilter(&tracePotential, traceFilter, indice, traceDelta, 1);
+        }
+        for(uint16_t i=0; i<TRACE_DECAY-1; i++){
+            indice = round(pastPosition[i][0]) + round(pastPosition[i][1])*tracePotential.layout.dim[1].size;
+            applyFilter(&tracePotential, traceFilter, indice, traceDelta, -1);
+        }
+    }
+    else if(pastPosition.size()!=0){
+        // ROS_INFO("Not the right size : %d", pastPosition.size());
+        for(uint16_t i=0; i<pastPosition.size()-1; i++){
+            indice = round(pastPosition[i][0]) + round(pastPosition[i][1])*tracePotential.layout.dim[1].size;
+            applyFilter(&tracePotential, traceFilter, indice, traceDelta, 1);
+        }
+        // ROS_INFO("That's fine nvmd");
+    }
+}
 
 void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
 	// ROS_INFO("PlannifNode::sendStaticPotential()\n");
