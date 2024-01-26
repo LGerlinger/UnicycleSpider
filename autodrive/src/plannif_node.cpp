@@ -1,4 +1,5 @@
 #include "../include/plannif_node.hpp"
+#include <cmath>
 
 
 PlannifNode::PlannifNode() : tfBuffer(), tfListener(tfBuffer){
@@ -62,6 +63,8 @@ PlannifNode::~PlannifNode() {
     staticPotential.layout.dim.resize(0);
 
     delete[] map_data;
+    delete[] goalMap;
+    delete[] ptsToChange;
 
     sub_activation_.shutdown();
     sub_goal_.shutdown();
@@ -92,8 +95,14 @@ void PlannifNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
     
     if (!first_init) { // On a la carte donc l'origine de la carte
         goalOffset();
-        //Recalcul map 
-        calculGoalPotential();
+        //Recalcul map
+        if (goalMode) {
+            ROS_INFO("calculGoalPotential1 appelle adepuis PlannifNode::goalCallback ! On a pas de map_data ??");
+            calculGoalPotential1();
+        }
+        else {
+            calculGoalPotential();
+        }
     }
 }
 
@@ -124,7 +133,9 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
         initMaps(msg->info.width, msg->info.height);
 
         goalOffset();
-        calculGoalPotential();
+        if (goalMode == 0) {
+            calculGoalPotential();
+        }
         
         
         for(uint16_t i=0; i < pastPosition.size(); i++){
@@ -140,18 +151,17 @@ void PlannifNode::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
     std::copy(data_vector.begin(), data_vector.end(), map_data);
     //calculduPotentiel
     calculInitPotential();
+    if (goalMode == 1) {
+        calculGoalPotential1();
+    }
 }
 
-/**
-* @bug crash lorsque la map s'aggrandie :( jsp pk
-ça a l'air de crasher parce qu'on veut augmenter la taille du vector initPotential.data
-une piste possible est qu'on écrit sur de la mémoire qui n'appartient pas au vecteur jsp comment ni quand
-*/
+
 void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
 	ROS_INFO("PlannifNode::initMaps(width = %d,  height = %d)\n",
 	 	width_, height_
 	);
-    size_t totalSize = width_ * height_ * sizeof(uint8_t);
+    size_t totalSize = width_ * height_ * sizeof(uint8_t); // Prévenir Léo si on utilise autre chose que uint8_t (regarder plus bas à goalMap ;-) 
 	
     //InitPotential
     initPotential.layout.dim[0].size = height_;
@@ -169,7 +179,7 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     //tracePotential
     tracePotential.layout.dim[0].size = height_;
     tracePotential.layout.dim[1].size = width_;
-    //tracePotential.data.clear();
+    tracePotential.data.clear();
     tracePotential.data.resize(totalSize);
     std::fill(tracePotential.data.begin(), tracePotential.data.end(), 0);
 
@@ -179,6 +189,16 @@ void PlannifNode::initMaps(uint32_t width_, uint32_t height_){
     //staticPotential.data.clear();
     staticPotential.data.resize(totalSize);
     std::fill(staticPotential.data.begin(), staticPotential.data.end(), 0);
+
+    delete[] goalMap;
+    goalMap = new float[totalSize / (goalMapRes*goalMapRes)];
+    ROS_INFO("goalMap cree taille : %ld", totalSize / (goalMapRes*goalMapRes));
+    std::fill(goalMap, goalMap + totalSize / (goalMapRes*goalMapRes), 0);
+
+    delete[] ptsToChange;
+    ptsToChangeSize = 4* totalSize / (goalMapRes*goalMapRes);
+    ptsToChange = new uint32_t[ptsToChangeSize];
+    ROS_INFO("taille de ptsToChange : %ld", ptsToChangeSize);
 }
 
 /**
@@ -202,7 +222,7 @@ void PlannifNode::preCalculateFilter(float* filter_, uint8_t delta, int taille_f
     }
     float rapport = (float)(mult * GOAL_VAL_MAX) / (OCCUPANCYGRID_VAL_MAX * somme);
 		for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
-				filter_[i] *= rapport;
+            filter_[i] *= rapport;
 		}
 }
 
@@ -275,6 +295,7 @@ void PlannifNode::calculInitPotential(){
     printMap(initPotential, "initPotential", GOAL_VAL_MAX);
 }
 
+
 void PlannifNode::calculGoalPotential() {
     ROS_INFO("PlannifNode::calculGoalPotential()\n");
     int delta = 0;
@@ -320,8 +341,125 @@ void PlannifNode::calculGoalPotential() {
     printMap(goalPotential, "goalPotential", GOAL_VAL_MAX);
 }
 
+void PlannifNode::calculGoalPotential1() {
+    ROS_INFO("PlannifNode::calculGoalPotential1()");
+    uint32_t h = initPotential.layout.dim[0].size / goalMapRes;
+	uint32_t w = initPotential.layout.dim[1].size / goalMapRes;
+
+    // On détecte les murs : 
+    bool contientMur;
+    for (uint32_t y=0; y<h; y++) {
+        for (uint32_t x=0; x<w; x++) {
+            contientMur = false;
+            for (uint8_t dy=0; dy < goalMapRes; dy++) {
+                for (uint8_t dx=0; dx < goalMapRes; dx++) {
+                    // debug
+                    // ROS_INFO("\tindice : %d", (goalMapRes*y + dy)*initPotential.layout.dim[1].size + goalMapRes*x + dx);
+
+                    if (map_data[(initPotential.layout.dim[0].size-1 - (goalMapRes*y + dy))*initPotential.layout.dim[1].size + goalMapRes*x + dx] > 84) {
+                        contientMur = true;
+                        dy = 254;
+                        break;
+                    }
+                }
+            }
+            if (contientMur) {goalMap[y*w + x] = -1;}
+            else {goalMap[y*w + x] = INFINITY;}
+        }
+    }
+
+    ROS_INFO("PlannifNode::calculGoalPotential exploration");
+    // On explore depuis l'objectif
+    uint32_t x, y;
+    uint32_t pXd, pYd;
+    float sqrt2 = sqrt(2);
+    float temp;
+
+    uint64_t curseur = 0;
+    uint64_t end = 2;
+    ptsToChange[curseur   ] = round(goal_point[0] / goalMapRes);
+    ptsToChange[curseur +1] = round(goal_point[1] / goalMapRes);
+
+    goalMap[(uint64_t)(ptsToChange[curseur +1]*w + ptsToChange[curseur])] = 0;
+
+    while (curseur < end && end < ptsToChangeSize) {
+        // ROS_INFO("curseur : %ld,   end : %ld", curseur, end);
+        x = ptsToChange[curseur];
+        y = ptsToChange[curseur+1];
+        // ROS_INFO("goalMap[%d, %d] = %f", x, y, goalMap[y*w+x]);
+        for (int8_t dx=-1; dx < 2; dx++) {
+            pXd = x+dx;
+            if (pXd < w) {
+                for (int8_t dy=-1; dy < 2; dy++) {
+                    pYd = y+dy;
+                    if (pYd < h && goalMap[pYd*w + pXd] >= 0) { // Dans la goalMap et pixel ne contient pas de mur
+                        // ROS_INFO("\tgoalMap[%d, %d], indice = %d", pXd, pYd, pYd*w+pXd);
+
+                        temp = goalMap[y*w + x];
+                        if (dx != 0 && dy != 0) temp += sqrt2;
+                        else temp += 1;
+                    
+                        // ROS_INFO("\ttemp = %f et goalMap[%d, %d] = %f", temp, pXd, pYd, goalMap[pYd*w + pXd]);
+                        //ROS_INFO("%d", (uint32_t)goalMap[pYd*w + pXd]);
+                        if (temp < goalMap[pYd*w + pXd]) {
+                            goalMap[pYd*w + pXd] = temp;
+                            ptsToChange[end   ] = pXd;
+                            ptsToChange[end +1] = pYd;
+                            end += 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        curseur += 2;
+    }
+
+    // On cherche le maximum déposé sur la goalMap pour ensuite normaliser les valeurs à GOAL_VAL_MAX
+    // float max = -INFINITY;
+    // for (uint32_t y=0; y<h; y++) {
+    //     for (uint32_t x=0; x<w; x++) {
+    //         if (max < goalMap[y*w +x]) {
+    //             max = goalMap[y*w +x];
+    //         }
+    //     }
+    // }
+
+    float max = goalMap[(uint32_t)round(actualPosition[1]/goalMapRes)* w + (uint32_t)round(actualPosition[0]/goalMapRes)] + 10;
+    ROS_INFO("pos = [%f, %f],  max = %f",actualPosition[0], actualPosition[1], max);
+
+
+    //ROS_INFO("PlannifNode::calculGoalPotential1 remise dans goalPotential");
+    // On met goalMap dans goalPotential
+    // float temp;
+    for (uint32_t y=0; y<h; y++) {
+        for (uint32_t x=0; x<w; x++) {
+            if (goalMap[y*w + x] != -1) { // Pas un mur
+                for (uint8_t dy=0; dy < goalMapRes; dy++) {
+                    for (uint8_t dx=0; dx < goalMapRes; dx++) {
+                        temp = round(goalMap[y*w + x] * GOAL_VAL_MAX / max + GOAL_VAL_MIN);
+                        temp = temp > GOAL_VAL_MAX + GOAL_VAL_MIN ? GOAL_VAL_MAX + GOAL_VAL_MIN : temp;
+
+                        goalPotential.data[(goalMapRes*y + dy)*initPotential.layout.dim[1].size + goalMapRes*x + dx] = temp;
+                    }
+                }
+            }
+            else {
+                for (uint8_t dy=0; dy < goalMapRes; dy++) {
+                    for (uint8_t dx=0; dx < goalMapRes; dx++) {
+                        goalPotential.data[(goalMapRes*y + dy)*initPotential.layout.dim[1].size + goalMapRes*x + dx] = GOAL_VAL_MAX-10;
+                    }
+                }
+            }
+        }
+    }
+    printMap(goalPotential, "goalPotential", GOAL_VAL_MAX);
+    ROS_INFO("PlannifNode::calculGoalPotential1 end !");
+}
+
+
 void PlannifNode::calculTracePotential(const ros::TimerEvent& event){
-	ROS_INFO("PlannifNode::calculTracePotential(const ros::TimerEvent& event)\n");
+	// ROS_INFO("PlannifNode::calculTracePotential(const ros::TimerEvent& event)\n");
 
     uint32_t indice;
 

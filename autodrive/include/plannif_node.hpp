@@ -22,7 +22,7 @@
 #define TRACE_COEFF_A 1
 #define WALL_COEFF_A 1
 
-#define TAILLE_FILTRE_WALL 29 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
+#define TAILLE_FILTRE_WALL 35 // PAS DE FILTRE DE TAILLE PAIRE !!
 #define WALL_MULT 10
 #define WALL_COEFF_B 0.01
 
@@ -30,7 +30,7 @@
 #define CALCUL_TRACE_MAP_HZ 5.0
 #define TAILLE_MAX_TRACE 10
 #define TAILLE_FILTRE_TRACE 31
-#define TRACE_MULT 400
+#define TRACE_MULT 10
 #define TRACE_COEFF_B 0.09
 
 //Autres 
@@ -80,6 +80,12 @@ class PlannifNode {
 
         uint8_t wallDelta = 0;
         uint8_t traceDelta = 0;
+        
+        // Pour goalMap : carte de potentiel noyée vers l'objectif
+        float* goalMap = nullptr;
+        uint8_t goalMapRes = 4;
+        uint32_t* ptsToChange = nullptr; // Tableau de pair d'entiers
+        uint64_t ptsToChangeSize = 0;
 
         std::vector<std::array<float, 2>> pastPositionBrut;
         std::vector<std::array<float, 2>> pastPosition;
@@ -92,7 +98,9 @@ class PlannifNode {
         void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
         void initMaps(uint32_t width_, uint32_t height_);
         void calculInitPotential();
+        uint8_t goalMode = 1;
         void calculGoalPotential();
+        void calculGoalPotential1();
         void calculTracePotential(const ros::TimerEvent& event);
         void sendStaticPotential(const ros::TimerEvent& event);
 

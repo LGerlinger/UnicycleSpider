@@ -70,7 +70,7 @@ private :
 	float posture[3] = {0, 0, 0};
 	float gradient[2] = {0, 0};
 	
-	float coefMomentum = 0.0f;
+	float coefMomentum = 0.f;
 	float coefCmdLin = 0.01f;
 	float coefCmdRot = 0.8f;
 
