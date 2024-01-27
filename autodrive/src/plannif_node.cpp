@@ -383,9 +383,6 @@ void PlannifNode::calculGoalPotential1() {
             contientMur = false;
             for (uint8_t dy=0; dy < goalMapRes; dy++) {
                 for (uint8_t dx=0; dx < goalMapRes; dx++) {
-                    // debug
-                    // ROS_INFO("\tindice : %d", (goalMapRes*y + dy)*initPotential.layout.dim[1].size + goalMapRes*x + dx);
-
                     if (map_data[(initPotential.layout.dim[0].size-1 - (goalMapRes*y + dy))*initPotential.layout.dim[1].size + goalMapRes*x + dx] > 84) {
                         contientMur = true;
                         dy = 254;
@@ -398,7 +395,7 @@ void PlannifNode::calculGoalPotential1() {
         }
     }
 
-    ROS_INFO("PlannifNode::calculGoalPotential exploration");
+    // ROS_INFO("PlannifNode::calculGoalPotential exploration");
     // On explore depuis l'objectif
     uint32_t x, y;
     uint32_t pXd, pYd;
@@ -456,7 +453,7 @@ void PlannifNode::calculGoalPotential1() {
     // }
 
     float max = goalMap[(uint32_t)round(actualPosition[1]/goalMapRes)* w + (uint32_t)round(actualPosition[0]/goalMapRes)] + 10;
-    ROS_INFO("pos = [%f, %f],  max = %f",actualPosition[0], actualPosition[1], max);
+    // ROS_INFO("pos = [%f, %f],  max = %f",actualPosition[0], actualPosition[1], max);
 
 
     //ROS_INFO("PlannifNode::calculGoalPotential1 remise dans goalPotential");
@@ -553,7 +550,7 @@ void PlannifNode::sendStaticPotential(const ros::TimerEvent& event){
     //Faire l'addition de toutes les maps 
     addPotentialToStatic(initPotential, 1);
     addPotentialToStatic(goalPotential, 1);
-    addPotentialToStatic(tracePotential, 1);
+    //addPotentialToStatic(tracePotential, 1);
 
     //Affichage des maps
     printMap(staticPotential, "staticPotential", 255);

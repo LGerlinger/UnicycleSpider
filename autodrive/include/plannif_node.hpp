@@ -27,7 +27,7 @@
 #define WALL_COEFF_B 0.01
 
 
-#define CALCUL_TRACE_MAP_HZ 4.0
+#define CALCUL_TRACE_MAP_HZ 0.5f //4.0
 #define TRACE_DELAY 2 //Nombre de valeur de décalage
 #define TRACE_DECAY 5
 #define TAILLE_MAX_TRACE 20.0

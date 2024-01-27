@@ -143,14 +143,7 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 		
 		// ROS_INFO("COMMANDE : Angles : post %f, diff %f ", posture[2], diffAngle);
 		// Seuils
-		if (abs(diffAngle) > 2*M_PI/3) {
-			msg.linear.x = 0;
-		} else {
-			msg.linear.x = coefCmdLin * (M_PI - abs(diffAngle))/M_PI;
-			if (msg.linear.x > 2) {
-				msg.linear.x = 2.0f;
-			}
-		}
+		msg.linear.x = coefCmdLin * (2*M_PI/3 - abs(diffAngle))/M_PI;
 
 		if (abs(msg.angular.z) < 0.18f) {
 			if (msg.angular.z < 0) {
