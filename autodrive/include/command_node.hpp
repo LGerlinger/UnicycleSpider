@@ -87,7 +87,9 @@ private :
 	void printMap(const uint8_t* carte, std::string nom, uint16_t valMax);
 };
 
-
+inline int8_t min(int8_t a, int64_t b) {
+	return a < b ? a : b;
+};
 
 
 #endif

@@ -18,8 +18,8 @@
 
 #include <cmath>
 
-#define TAILLE_FILTRE_GAUSS 23 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
-#define WALL_MULT 1
+#define TAILLE_FILTRE_GAUSS 27 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
+#define WALL_MULT 1.1
 
 //Autres 
 #define GOAL_VAL_MAX 200 // < 255

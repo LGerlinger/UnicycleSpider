@@ -1,4 +1,5 @@
 # include "../include/command_node.hpp"
+#include <cmath>
 
 CommandNode::CommandNode(): tfBuffer(), tfListener(tfBuffer) {
 	// map = (uint8_t*)malloc(1);
@@ -102,19 +103,22 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 
 	//Récupération de la position actuelle
 	getRobotPos();
-	
+
 	//Calcul du gradient
-	for (int8_t dy = -delta; dy < delta+1; dy++) {
+	// On cherche les min et max pour éviter les débordement hors de l'image ET pour ne pas faire de tests dans les boucles 
+	int8_t minX = - min(delta, pixelPosition[0]);
+	int8_t minY = - min(delta, pixelPosition[1]);
+	int8_t maxX = min(delta, (int64_t)(width-1) - pixelPosition[0]) +1; // crash probablement parce que on balance un grand nombre dans un int8_t
+	int8_t maxY = min(delta, (int64_t)(height-1) - pixelPosition[1]) +1;
+	// ROS_INFO("min-max   x : [%d, %d],   y : [%d, %d]", minX, maxX, minY, maxY);
+
+	for (int8_t dy = minY; dy < maxY; dy++) {
 		pYd = pixelPosition[1] + dy;
-		if (0 <= pYd && pYd < height) {
-			for (int8_t dx = -delta; dx < delta+1; dx++) {
-				pXd = pixelPosition[0] + dx;
-				if (0 <= pXd && pXd < width) {
-					// Trouver le sens
-					nouveauGradient[0] -= dx * filtre[dy+delta][dx+delta] * map[pYd*width + pXd];
-					nouveauGradient[1] -= dy * filtre[dy+delta][dx+delta] * map[pYd*width + pXd]; 
-				}
-			}
+		for (int8_t dx = minX; dx < maxX; dx++) {
+			pXd = pixelPosition[0] + dx;
+			// Trouver le sens
+			nouveauGradient[0] -= dx * filtre[dy+delta][dx+delta] * map[pYd*width + pXd];
+			nouveauGradient[1] -= dy * filtre[dy+delta][dx+delta] * map[pYd*width + pXd]; 
 		}
 	}
 	gradient[0] = coefMomentum * gradient[0] + nouveauGradient[0];
@@ -130,7 +134,7 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	geometry_msgs::Twist msg;
 	if (norme < 0.01f) {
 		msg.angular.z = 0.5f;
-		msg.linear.x = 0.f;
+		msg.linear.x = 0.1f;
 	}
 	else {
 		float angleVoulu = - atan2(gradient[1], gradient[0]);

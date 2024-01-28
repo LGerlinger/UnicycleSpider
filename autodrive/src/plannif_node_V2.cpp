@@ -133,6 +133,7 @@ void PlannifNode_V2::mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
 		originMap = msg->info.origin;
 		resolution = msg->info.resolution;
 		initMaps(msg->info.width, msg->info.height);
+		goalOffset();
 		
 		//Calcul des nouvelles positions précédentes
 		for(uint16_t i=0; i < pastPosition.size(); i++){
@@ -246,8 +247,17 @@ void PlannifNode_V2::rechLarg(uint32_t height, uint32_t width) {
 
 	uint64_t curseur = 0;
 	uint64_t end = 2;
-	ptsToChange[curseur   ] = round(goal_point[0] / goalMapRes);
-	ptsToChange[curseur +1] = round(goal_point[1] / goalMapRes);
+
+	int64_t goalX = round(goal_point[0] / goalMapRes);
+	int64_t goalY = round(goal_point[1] / goalMapRes);
+
+	if (goalX >= w) goalX = w-1;
+	else if (goalX < 0) goalX = 0;
+	if (goalY >= h) goalY = h-1;
+	else if (goalY < 0) goalY = 0;
+
+	ptsToChange[curseur   ] = goalX;
+	ptsToChange[curseur +1] = goalY;
 
 	goalMap[(uint64_t)(ptsToChange[curseur +1]*w + ptsToChange[curseur])] = 0;
 
@@ -303,7 +313,8 @@ void PlannifNode_V2::normalise(uint32_t height, uint32_t width) {
 	actualPosition[0] = (actualPosition[0] - originMap.position.x)/resolution;
     actualPosition[1] = height -1 - (actualPosition[1] - originMap.position.y)/resolution;
 
-	float max = goalMap[(uint32_t)round(actualPosition[1]/goalMapRes)* w + (uint32_t)round(actualPosition[0]/goalMapRes)] + TAILLE_FILTRE_GAUSS + 10;
+
+	float max = goalMap[(uint32_t)round(actualPosition[1]/goalMapRes)* w + (uint32_t)round(actualPosition[0]/goalMapRes)] + 20;
 
 	float temp;
 	for (uint32_t y=0; y<h; y++) {
@@ -364,7 +375,7 @@ void PlannifNode_V2::preCalculateFilter(float* filter_, uint8_t delta, int taill
 			somme += filter_[x+delta + (y+delta)*taille_filtre];
 		}
 	}
-	float rapport = (float)(mult * GOAL_VAL_MAX) / (OCCUPANCYGRID_VAL_MAX * somme);
+	float rapport = mult / somme;
 		for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
 			filter_[i] *= rapport;
 		}
@@ -395,6 +406,7 @@ void PlannifNode_V2::applyConvolution(uint8_t* mapData, uint32_t height, uint32_
 			else if (temp > 255) temp = 255;
 			
 			staticPotential.data[y*width + x] = (uint8_t)round(temp);		
+			// staticPotential.data[y*width + x] = mapData_temp[y*width+x];		
 		}
 	}
 }
