@@ -7,6 +7,8 @@ CommandNode::CommandNode(): tfBuffer(), tfListener(tfBuffer) {
 	height = 1;
 
 
+	// preCalculateFilter(filtre, TAILLE_FILTRE/2, TAILLE_FILTRE, 1);
+
 	for (uint8_t y=0; y<TAILLE_FILTRE; y++) {
 		for (uint8_t x=0; x<TAILLE_FILTRE; x++) {
 			filtre[y][x] = 1/(sqrt(
@@ -179,6 +181,32 @@ void CommandNode::getRobotPos(){
 	}
 }
 
+/**
+* @bug Il y a un dépassement de mémoire si taille_filtre est pair ou si le filtre n'a pas la taille indiquée.
+*/
+void CommandNode::preCalculateFilter(float filter_[TAILLE_FILTRE][TAILLE_FILTRE], uint8_t delta, int taille_filtre, float mult){
+	// ROS_INFO("CommandNode::preCalculateFilter(filter, delta=%d, taille_filtre=%d, mult=%f)\n",
+	// 	delta, taille_filtre, mult
+	// );
+	float distance_centre = 0;
+	float somme=0;
+	float sigma = -4 * log(0.01f)/(taille_filtre*taille_filtre);
+	printf("\n");
+	for(int y=-delta; y<delta+1; y++){
+		for(int x=-delta; x<delta+1; x++){
+
+			distance_centre = abs(x*x + y*y); // distance carrée
+			filter_[delta + y][delta + x] = exp(-sigma*distance_centre);
+			somme += filter_[delta + y][delta + x];
+		}
+	}
+	float rapport = mult / somme;
+	for(int y=-delta; y<delta+1; y++){
+		for(int x=-delta; x<delta+1; x++){
+			filter_[delta + y][delta + x] *= rapport;
+		}
+	}
+}
 
 /**
  * @brief Enregistrement d'une map

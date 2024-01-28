@@ -28,7 +28,7 @@
 
 #define SEND_CMD_HZ 10
 
-#define TAILLE_FILTRE 11
+#define TAILLE_FILTRE 25 // 11
 
 
 class CommandNode {
@@ -84,6 +84,8 @@ private :
 	void changeState(const std_msgs::Bool::ConstPtr& stop);
 	void mapCallback(const nav_msgs::OccupancyGrid::ConstPtr& msg);
 	void getPotMapCallback(const std_msgs::UInt8MultiArray& msg); // http://docs.ros.org/en/api/nav_msgs/html/msg/OccupancyGrid.html
+
+	void preCalculateFilter(float filter_[TAILLE_FILTRE][TAILLE_FILTRE], uint8_t delta, int taille_filtre, float mult);
 	void printMap(const uint8_t* carte, std::string nom, uint16_t valMax);
 };
 

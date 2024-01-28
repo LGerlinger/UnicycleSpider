@@ -182,7 +182,7 @@ void PlannifNode_V2::initMaps(uint32_t width_, uint32_t height_){
 
 
 void PlannifNode_V2::calculGoalMap() {
-	ROS_INFO("PlannifNode_V2::calculGoalMap()");
+	// ROS_INFO("PlannifNode_V2::calculGoalMap()");
 	uint32_t height = staticPotential.layout.dim[0].size;
 	uint32_t width = staticPotential.layout.dim[1].size;
 
@@ -210,7 +210,7 @@ void PlannifNode_V2::calculGoalMap() {
 *	changeant les autres    en INFINITY
 */
 void PlannifNode_V2::map2Goal(uint32_t height, uint32_t width) {
-	ROS_INFO("PlannifNode_V2::map2Goal");
+	// ROS_INFO("PlannifNode_V2::map2Goal");
 	uint32_t h = height / goalMapRes;
 	uint32_t w = width / goalMapRes;
 	bool contientMur;
@@ -299,7 +299,7 @@ void PlannifNode_V2::rechLarg(uint32_t height, uint32_t width) {
 * Normalise goalMap pour le remettre dans mapData_temp
 */
 void PlannifNode_V2::normalise(uint32_t height, uint32_t width) {
-	ROS_INFO("PlannifNode_V2::normalise");
+	// ROS_INFO("PlannifNode_V2::normalise");
 	uint32_t h = height / goalMapRes;
 	uint32_t w = width / goalMapRes;
 
@@ -346,7 +346,7 @@ void PlannifNode_V2::normalise(uint32_t height, uint32_t width) {
 
 
 void PlannifNode_V2::sendStaticPotential(const std_msgs::UInt8MultiArray& msg){
-	ROS_INFO("PlannifNode_V2::sendStaticPotential()\n");
+	// ROS_INFO("PlannifNode_V2::sendStaticPotential()\n");
 
 	//Envoyer la map sur le topic
 	pub_staticmap.publish(msg);
@@ -360,15 +360,15 @@ void PlannifNode_V2::sendStaticPotential(const std_msgs::UInt8MultiArray& msg){
 * @bug Il y a un dépassement de mémoire si taille_filtre est pair ou si le filtre n'a pas la taille indiquée.
 */
 void PlannifNode_V2::preCalculateFilter(float* filter_, uint8_t delta, int taille_filtre, float mult){
-	ROS_INFO("PlannifNode_V2::preCalculateFilter(filter, delta=%d, taille_filtre=%d, mult=%f)\n",
-		delta, taille_filtre, mult
-	);
+	// ROS_INFO("PlannifNode_V2::preCalculateFilter(filter, delta=%d, taille_filtre=%d, mult=%f)\n",
+	// 	delta, taille_filtre, mult
+	// );
 	float distance_centre = 0;
-		float somme=0;
-		float sigma = -4 * log(0.01f)/(taille_filtre*taille_filtre);
+	float somme=0;
+	float sigma = -4 * log(0.01f)/(taille_filtre*taille_filtre);
 	printf("\n");
-	for(int y=-delta; y<delta+1; y++){
-		for(int x=-delta; x<delta+1; x++){
+	for(int16_t y=-delta; y<delta+1; y++){
+		for(int16_t x=-delta; x<delta+1; x++){
 
 			distance_centre = abs(x*x + y*y); // distance carrée
 			filter_[x+delta + (y+delta)*taille_filtre] = exp(-sigma*distance_centre);
@@ -376,16 +376,16 @@ void PlannifNode_V2::preCalculateFilter(float* filter_, uint8_t delta, int taill
 		}
 	}
 	float rapport = mult / somme;
-		for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
-			filter_[i] *= rapport;
-		}
+	for (uint16_t i=0; i < taille_filtre*taille_filtre; i++) {
+		filter_[i] *= rapport;
+	}
 }
 
 
 void PlannifNode_V2::applyConvolution(uint8_t* mapData, uint32_t height, uint32_t width, float* filter_, uint8_t delta){
-	ROS_INFO("PlannifNode_V2::applyConvolution(mapData = %p, height=%d, width=%d, filter_=%p, delta=%d)\n",
-		mapData, height, width, filter_, delta
-	);
+	// ROS_INFO("PlannifNode_V2::applyConvolution(mapData = %p, height=%d, width=%d, filter_=%p, delta=%d)\n",
+	// 	mapData, height, width, filter_, delta
+	// );
 
 	float temp;
 	uint16_t i;
@@ -410,159 +410,6 @@ void PlannifNode_V2::applyConvolution(uint8_t* mapData, uint32_t height, uint32_
 		}
 	}
 }
-
-
-// void PlannifNode_V2::calculInitPotential(){
-// 	ROS_INFO("PlannifNode_V2::calculInitPotential(), wallDelta=%d\n", wallDelta);
-	
-// 	uint32_t h = initPotential.layout.dim[0].size;
-// 	uint32_t w = initPotential.layout.dim[1].size;
-	
-// 	uint64_t indice;
-// 	for (indice=0; indice < h*w; indice++) {
-// 		if (map_data[indice] > 101) { // La zone est inconnue
-// 			map_data[indice] = 0;
-// 		}
-// 	}
-
-// 	for(uint32_t y=wallDelta; y<(h-wallDelta); y++){
-// 		for(uint32_t x=wallDelta; x<(w-wallDelta); x++){
-// 			indice = x + y*w;
-// 			//faire le filtre
-// 			applyConvolution(map_data, w, wallFilter,
-// 			x + (h-y-1)*w,
-// 			wallDelta, initPotential.data[indice]);
-// 		}
-// 	}
-	
-// 	printMap(initPotential, "initPotential", GOAL_VAL_MAX);
-// }
-
-/*
-void PlannifNode_V2::calculGoalPotential() {
-	ROS_INFO("PlannifNode_V2::calculGoalPotential()");
-	uint32_t h = staticPotential.layout.dim[0].size / goalMapRes;
-	uint32_t w = staticPotential.layout.dim[1].size / goalMapRes;
-
-	// On détecte les murs : 
-	bool contientMur;
-	for (uint32_t y=0; y<h; y++) {
-		for (uint32_t x=0; x<w; x++) {
-			contientMur = false;
-			for (uint8_t dy=0; dy < goalMapRes; dy++) {
-				for (uint8_t dx=0; dx < goalMapRes; dx++) {
-					// ROS_INFO("map[%d, %d] = %d", goalMapRes*x+dx, goalMapRes*y+dy, map_data[(staticPotential.layout.dim[0].size-1 - (goalMapRes*y + dy))*staticPotential.layout.dim[1].size + goalMapRes*x + dx]);
-
-					if (map_data[(staticPotential.layout.dim[0].size-1 - (goalMapRes*y + dy))*staticPotential.layout.dim[1].size + goalMapRes*x + dx] == 100) {
-						contientMur = true;
-						dy = 254;
-						break;
-					}
-				}
-			}
-			if (contientMur) {goalMap[y*w + x] = -1;}
-			else {goalMap[y*w + x] = INFINITY;}
-		}
-	}
-
-	// ROS_INFO("PlannifNode_V2::calculGoalPotential exploration");
-	// On explore depuis l'objectif
-	uint32_t x, y;
-	uint32_t pXd, pYd;
-	float sqrt2 = sqrt(2);
-	float temp;
-
-	uint64_t curseur = 0;
-	uint64_t end = 2;
-	ptsToChange[curseur   ] = round(goal_point[0] / goalMapRes);
-	ptsToChange[curseur +1] = round(goal_point[1] / goalMapRes);
-
-	goalMap[(uint64_t)(ptsToChange[curseur +1]*w + ptsToChange[curseur])] = 0;
-
-	while (curseur < end && end < ptsToChangeSize) {
-		// ROS_INFO("curseur : %ld,   end : %ld", curseur, end);
-		x = ptsToChange[curseur];
-		y = ptsToChange[curseur+1];
-		// ROS_INFO("goalMap[%d, %d] = %f", x, y, goalMap[y*w+x]);
-		for (int8_t dx=-1; dx < 2; dx++) {
-			pXd = x+dx;
-			if (pXd < w) {
-				for (int8_t dy=-1; dy < 2; dy++) {
-					pYd = y+dy;
-					if (pYd < h && goalMap[pYd*w + pXd] >= 0) { // Dans la goalMap et pixel ne contient pas de mur
-						// ROS_INFO("\tgoalMap[%d, %d], indice = %d", pXd, pYd, pYd*w+pXd);
-
-						temp = goalMap[y*w + x];
-						if (dx != 0 && dy != 0) temp += sqrt2;
-						else temp += 1;
-					
-						// ROS_INFO("\ttemp = %f et goalMap[%d, %d] = %f", temp, pXd, pYd, goalMap[pYd*w + pXd]);
-						//ROS_INFO("%d", (uint32_t)goalMap[pYd*w + pXd]);
-						if (temp < goalMap[pYd*w + pXd]) {
-							goalMap[pYd*w + pXd] = temp;
-							ptsToChange[end   ] = pXd;
-							ptsToChange[end +1] = pYd;
-							end += 2;
-						}
-					}
-				}
-			}
-		}
-
-		curseur += 2;
-	}
-
-	//Récupération de la position actuelle 
-    try {
-        tfRobot2Map = tfBuffer.lookupTransform("map", "base_link", ros::Time(0));
-        actualPosition[0] = tfRobot2Map.transform.translation.x;
-        actualPosition[1] = tfRobot2Map.transform.translation.y;
-    }catch (tf2::TransformException& ex) {
-        ROS_WARN("%s", ex.what());
-    }
-	actualPosition[0] = (actualPosition[0] - originMap.position.x)/resolution;
-    actualPosition[1] = staticPotential.layout.dim[0].size -1 - (actualPosition[1] - originMap.position.y)/resolution;
-
-	float max = goalMap[(uint32_t)round(actualPosition[1]/goalMapRes)* w + (uint32_t)round(actualPosition[0]/goalMapRes)] + 10;
-	ROS_INFO("pos = [%f, %f],  max = %f",actualPosition[0], actualPosition[1], max);
-
-
-	//ROS_INFO("PlannifNode_V2::calculGoalPotential1 remise dans staticPotential");
-	// On met goalMap dans staticPotential
-	// float temp;
-	for (uint32_t y=0; y<h; y++) {
-		for (uint32_t x=0; x<w; x++) {
-			if (goalMap[y*w + x] != -1) { // Pas un mur
-				for (uint8_t dy=0; dy < goalMapRes; dy++) {
-					for (uint8_t dx=0; dx < goalMapRes; dx++) {
-						temp = round(goalMap[y*w + x] * GOAL_VAL_MAX / max);
-						temp = temp > GOAL_VAL_MAX ? GOAL_VAL_MAX : temp;
-
-						staticPotential.data[(goalMapRes*y + dy)*staticPotential.layout.dim[1].size + goalMapRes*x + dx] = temp;
-
-						// ROS_INFO("staticPotential[%d, %d] = %d", x+dx, y+dy, staticPotential.data[(goalMapRes*y + dy)*staticPotential.layout.dim[1].size + goalMapRes*x + dx]);
-					}
-				}
-			}
-			else {
-				for (uint8_t dy=0; dy < goalMapRes; dy++) {
-					for (uint8_t dx=0; dx < goalMapRes; dx++) {
-						staticPotential.data[(goalMapRes*y + dy)*staticPotential.layout.dim[1].size + goalMapRes*x + dx] = GOAL_VAL_MAX-10;
-
-						// ROS_INFO("staticPotential[%d, %d] = %d", x+dx, y+dy, staticPotential.data[(goalMapRes*y + dy)*staticPotential.layout.dim[1].size + goalMapRes*x + dx]);
-					}
-				}
-			}
-		}
-	}
-	ROS_INFO("PlannifNode_V2::calculGoalPotential end !");
-
-	printMap(staticPotential, "staticPotential", GOAL_VAL_MAX);
-
-	//Envoyer la map sur le topic
-	pub_staticmap.publish(staticPotential);
-}
-*/
   
 
 /**
