@@ -106,6 +106,17 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	//Récupération de la position actuelle
 	getRobotPos();
 
+	if (0 <= pixelPosition[0] && pixelPosition[0] < width &&
+		0 <= pixelPosition[1] && pixelPosition[1] < height)
+	{
+		if (map[pixelPosition[1]*width + pixelPosition[0]] < 20) {
+			coefVit = 0;
+		}
+		else {
+			coefVit = OG_COEF_VIT;
+		}
+	}
+
 	uint32_t nextPixelPosition[2] = {
 		pixelPosition[0] + (int16_t)(coefVit * cos(posture[2])),
 		pixelPosition[1] - (int16_t)(coefVit * sin(posture[2])),
