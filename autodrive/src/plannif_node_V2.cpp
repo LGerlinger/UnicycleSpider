@@ -191,7 +191,8 @@ void PlannifNode_V2::calculGoalMap() {
 		map_data[i] = map_data[i] == 255 ? 0 : map_data[i];
 	}
 
-	fermeture(map_data, width, height, 2); // -> map_data
+	fermeture(map_data, width, height, 5); // -> map_data
+	// printMap(map_data, height, width, "map_fermee", OCCUPANCYGRID_VAL_MAX);
 
 	map2Goal(height, width); // -> goalMap
 	rechLarg(height, width); // -> goalMap

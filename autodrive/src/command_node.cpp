@@ -106,18 +106,23 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 	//Récupération de la position actuelle
 	getRobotPos();
 
+	uint32_t nextPixelPosition[2] = {
+		pixelPosition[0] + (int16_t)(coefVit * cos(posture[2])),
+		pixelPosition[1] - (int16_t)(coefVit * sin(posture[2])),
+	};
+
 	//Calcul du gradient
 	// On cherche les min et max pour éviter les débordement hors de l'image ET pour ne pas faire de tests dans les boucles 
-	int8_t minX = - min(delta, pixelPosition[0]);
-	int8_t minY = - min(delta, pixelPosition[1]);
-	int8_t maxX = min(delta, (int64_t)(width-1) - pixelPosition[0]) +1; // crash probablement parce que on balance un grand nombre dans un int8_t
-	int8_t maxY = min(delta, (int64_t)(height-1) - pixelPosition[1]) +1;
+	int8_t minX = - min(delta, nextPixelPosition[0]);
+	int8_t minY = - min(delta, nextPixelPosition[1]);
+	int8_t maxX = min(delta, (int64_t)(width-1) - nextPixelPosition[0]) +1; // normalement pixelPosition[0] <= width-1
+	int8_t maxY = min(delta, (int64_t)(height-1) - nextPixelPosition[1]) +1; // idem
 	// ROS_INFO("min-max   x : [%d, %d],   y : [%d, %d]", minX, maxX, minY, maxY);
 
 	for (int8_t dy = minY; dy < maxY; dy++) {
-		pYd = pixelPosition[1] + dy;
+		pYd = nextPixelPosition[1] + dy;
 		for (int8_t dx = minX; dx < maxX; dx++) {
-			pXd = pixelPosition[0] + dx;
+			pXd = nextPixelPosition[0] + dx;
 			// Trouver le sens
 			nouveauGradient[0] -= dx * filtre[dy+delta][dx+delta] * map[pYd*width + pXd];
 			nouveauGradient[1] -= dy * filtre[dy+delta][dx+delta] * map[pYd*width + pXd]; 
@@ -145,7 +150,7 @@ void CommandNode::Map2Command(const ros::TimerEvent& event) {
 		if (diffAngle > M_PI) diffAngle = -2*M_PI + diffAngle;
 		else if (diffAngle < -M_PI) diffAngle = 2*M_PI + diffAngle;
 		
-		msg.angular.z = coefCmdRot * diffAngle;
+		msg.angular.z = coefCmdRot * diffAngle / (1+atan(coefVit));
 		
 		// ROS_INFO("COMMANDE : Angles : post %f, diff %f ", posture[2], diffAngle);
 		// Seuils

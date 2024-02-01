@@ -28,7 +28,7 @@
 
 #define SEND_CMD_HZ 10
 
-#define TAILLE_FILTRE 25 // 11
+#define TAILLE_FILTRE 11 // 11
 
 
 class CommandNode {
@@ -70,8 +70,9 @@ private :
 	float posture[3] = {0, 0, 0};
 	float gradient[2] = {0, 0};
 	
+	float coefVit = 5;
 	float coefMomentum = 0.f;
-	float coefCmdLin = 0.5f;
+	float coefCmdLin = 0.5f * 3.f/2;
 	float coefCmdRot = 0.8f;
 
 	bool first_init = true;

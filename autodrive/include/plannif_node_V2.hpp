@@ -18,7 +18,7 @@
 
 #include <cmath>
 
-#define TAILLE_FILTRE_GAUSS 27 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
+#define TAILLE_FILTRE_GAUSS 15 //23 // PAS DE FILTRE DE TAILLE PAIRE !!
 #define WALL_MULT 1.1
 
 //Autres 
