@@ -30,7 +30,7 @@
 
 #define TAILLE_FILTRE 11 // 11
 
-#define OG_COEF_VIT 5
+#define OG_COEF_VIT 3
 
 class CommandNode {
 public:
@@ -73,8 +73,8 @@ private :
 	
 	float coefVit = OG_COEF_VIT;
 	float coefMomentum = 0.f;
-	float coefCmdLin = 0.5f * 3.f/2;
-	float coefCmdRot = 0.8f;
+	float coefCmdLin = 0.3f * 3.f/2;
+	float coefCmdRot = 0.6f;//0.8f;
 
 	bool first_init = true;
 	bool stop_ = false;

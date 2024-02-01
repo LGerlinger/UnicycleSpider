@@ -39,6 +39,7 @@ class ManagerNode {
         double goal_point[2] =  {1000.0, 1000.0};;
         float actualPosition[2] = {0.0, 0.0};
         bool goalAchieved = true;
+        bool retour = false;
 
         void goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
         void getPosRobot(const ros::TimerEvent& event);

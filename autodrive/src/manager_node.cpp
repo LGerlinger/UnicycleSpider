@@ -26,6 +26,8 @@ void ManagerNode::goalCallback(const geometry_msgs::PoseStamped::ConstPtr& msg){
     stop.data = false;
     pub_activation_.publish(stop);
 
+    //Pour changer si il est sur le retour
+    retour = false;
 
     //ROS_INFO("MANAGER : Publish nouveau goal");
     pub_my_goal_.publish(my_goal);
@@ -57,11 +59,25 @@ void ManagerNode::getPosRobot(const ros::TimerEvent& event){
         //Stop les autres nodes si on est suffisament proche du goal
         if(distance_goal < THRESHOLD_DISTANCE_GOAL){
             ROS_INFO("MANAGER : GOAL ATTEINT");
-            goalAchieved = true;
-            std_msgs::Bool stop;
-            stop.data = true;
-            //Send l'arret des deux nodes 
-            pub_activation_.publish(stop);
+            if(retour){
+                goalAchieved = true;
+                std_msgs::Bool stop;
+                stop.data = true;
+                retour = false;
+                //Send l'arret des deux nodes 
+                pub_activation_.publish(stop);
+            }else{
+                geometry_msgs::PoseStamped my_goal;
+                
+                //Reviens au point de lancement de l'odometrie / SLAM
+                my_goal.pose.position.x = 0;
+                my_goal.pose.position.y = 0;
+                goal_point[0] = 0;
+                goal_point[1] = 0;
+                
+                retour = true;
+                pub_my_goal_.publish(my_goal);
+            }
         }
     }
 }
